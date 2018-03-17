@@ -129,7 +129,7 @@ def print_summary(symbol, shape=None, line_length=120, positions=[.44, .64, .74,
                             key = input_name + "_output"
                         else:
                             key = input_name
-                        if key in shape_dict:
+                        if key in shape_dict and len(shape_dict[key]) > 1:
                             shape = shape_dict[key][1:]
                             pre_filter = pre_filter + int(shape[0])
         cur_param = 0
