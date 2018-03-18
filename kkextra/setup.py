@@ -21,9 +21,14 @@ from __future__ import absolute_import
 import os
 import sys
 import shutil
+import platform
 
-sys.argv.append('--universal')
-sys.argv.append('--plat-name=win_amd64')
+if platform.system() == 'Linux':
+    sys.argv.append('--universal')
+    sys.argv.append('--plat-name=manylinux1_x86_64')
+else:
+    sys.argv.append('--universal')
+    sys.argv.append('--plat-name=win_amd64')
 
 from setuptools import setup
 from setuptools.extension import Extension
@@ -45,14 +50,34 @@ shutil.copytree(os.path.join(CURRENT_DIR, '../python/mxnet'),
                 os.path.join(CURRENT_DIR, 'mxnet'))
 
 shutil.copy(LIB_PATH[0], os.path.join(CURRENT_DIR, 'mxnet'))
-shutil.copy(r'D:\proj\dev\mxaio\bin\cudnn64_7.dll', os.path.join(CURRENT_DIR, 'mxnet'))
-shutil.copy(r'D:\proj\dev\mxaio\bin\libiomp5md.dll', os.path.join(CURRENT_DIR, 'mxnet'))
-shutil.copy(r'D:\proj\dev\mxaio\bin\mkl_avx2.dll', os.path.join(CURRENT_DIR, 'mxnet'))
-shutil.copy(r'D:\proj\dev\mxaio\bin\mkl_core.dll', os.path.join(CURRENT_DIR, 'mxnet'))
-shutil.copy(r'D:\proj\dev\mxaio\bin\mkl_intel_thread.dll', os.path.join(CURRENT_DIR, 'mxnet'))
-shutil.copy(r'D:\proj\dev\mxaio\bin\mkl_rt.dll', os.path.join(CURRENT_DIR, 'mxnet'))
-shutil.copy(r'D:\proj\dev\mxaio\bin\opencv_ffmpeg341_64.dll', os.path.join(CURRENT_DIR, 'mxnet'))
-shutil.copy(r'D:\proj\dev\mxaio\bin\opencv_world341.dll', os.path.join(CURRENT_DIR, 'mxnet'))
+data.append(os.path.join('mxnet', os.path.basename(LIB_PATH[0])))
+
+if platform.system() == 'Linux':
+    liblist = [
+        '/home/kk/dev/cudnn/lib64/libcudnn.so',
+        '/opt/intel/compilers_and_libraries/linux/lib/intel64/libiomp5.so',
+        '/opt/intel/mkl/lib/intel64/libmkl_avx2.so',
+        '/opt/intel/mkl/lib/intel64/libmkl_core.so',
+        '/opt/intel/mkl/lib/intel64/libmkl_intel_thread.so',
+        '/opt/intel/mkl/lib/intel64/libmkl_rt.so'
+    ]
+else:
+    liblist = [
+        'D:/proj/dev/mxaio/bin/cudnn64_7.dll',
+        'D:/proj/dev/mxaio/bin/libiomp5md.dll',
+        'D:/proj/dev/mxaio/bin/mkl_avx2.dll',
+        'D:/proj/dev/mxaio/bin/mkl_core.dll',
+        'D:/proj/dev/mxaio/bin/mkl_intel_thread.dll',
+        'D:/proj/dev/mxaio/bin/mkl_rt.dll',
+        'D:/proj/dev/mxaio/bin/opencv_ffmpeg341_64.dll',
+        'D:/proj/dev/mxaio/bin/opencv_world341.dll',
+    ]
+
+data = []
+
+for l in liblist:
+    shutil.copy(l, os.path.join(CURRENT_DIR, 'mxnet'))
+    data.append(os.path.join('mxnet' os.path.basename(l)))
 
 # Try to generate auto-complete code
 try:
@@ -62,19 +87,7 @@ try:
     _generate_op_module_signature('mxnet', 'symbol', _generate_symbol_function_code)
     _generate_op_module_signature('mxnet', 'ndarray', _generate_ndarray_function_code)
 except: # pylint: disable=bare-except
-    print("EXCEPT")
     pass
-
-data = []
-data.append(os.path.join('mxnet', os.path.basename(LIB_PATH[0])))
-data.append('mxnet/cudnn64_7.dll')
-data.append('mxnet/libiomp5md.dll')
-data.append('mxnet/mkl_avx2.dll')
-data.append('mxnet/mkl_core.dll')
-data.append('mxnet/mkl_intel_thread.dll')
-data.append('mxnet/mkl_rt.dll')
-data.append('mxnet/opencv_ffmpeg341_64.dll')
-data.append('mxnet/opencv_world341.dll')
 
 setup(name='mxnet',
       version=__version__,
