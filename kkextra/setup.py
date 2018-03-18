@@ -50,6 +50,8 @@ shutil.copytree(os.path.join(CURRENT_DIR, '../python/mxnet'),
                 os.path.join(CURRENT_DIR, 'mxnet'))
 
 shutil.copy(LIB_PATH[0], os.path.join(CURRENT_DIR, 'mxnet'))
+
+data = []
 data.append(os.path.join('mxnet', os.path.basename(LIB_PATH[0])))
 
 if platform.system() == 'Linux':
@@ -73,11 +75,10 @@ else:
         'D:/proj/dev/mxaio/bin/opencv_world341.dll',
     ]
 
-data = []
 
 for l in liblist:
     shutil.copy(l, os.path.join(CURRENT_DIR, 'mxnet'))
-    data.append(os.path.join('mxnet' os.path.basename(l)))
+    data.append(os.path.join('mxnet', os.path.basename(l)))
 
 # Try to generate auto-complete code
 try:
