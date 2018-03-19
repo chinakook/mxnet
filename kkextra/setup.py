@@ -56,7 +56,7 @@ data.append(os.path.join('mxnet', os.path.basename(LIB_PATH[0])))
 
 if platform.system() == 'Linux':
     liblist = [
-        '/home/kk/dev/cudnn/lib64/libcudnn.so',
+        '/home/kk/dev/cudnn/lib64/libcudnn.so.7.1.1',
         '/opt/intel/compilers_and_libraries/linux/lib/intel64/libiomp5.so',
         '/opt/intel/mkl/lib/intel64/libmkl_avx2.so',
         '/opt/intel/mkl/lib/intel64/libmkl_core.so',
