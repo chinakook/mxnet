@@ -65,14 +65,14 @@ if platform.system() == 'Linux':
     ]
 else:
     liblist = [
-        'D:/proj/dev/mxaio/bin/cudnn64_7.dll',
-        'D:/proj/dev/mxaio/bin/libiomp5md.dll',
-        'D:/proj/dev/mxaio/bin/mkl_avx2.dll',
-        'D:/proj/dev/mxaio/bin/mkl_core.dll',
-        'D:/proj/dev/mxaio/bin/mkl_intel_thread.dll',
-        'D:/proj/dev/mxaio/bin/mkl_rt.dll',
-        'D:/proj/dev/mxaio/bin/opencv_ffmpeg341_64.dll',
-        'D:/proj/dev/mxaio/bin/opencv_world341.dll',
+        '../../cudnn/bin/cudnn64_7.dll',
+        'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/compiler/libiomp5md.dll',
+        'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_avx2.dll',
+        'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_core.dll',
+        'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_intel_thread.dll',
+        'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_rt.dll',
+        'E:/dingkou/OSC15/opencv/build/x64/vc14/bin/opencv_ffmpeg341_64.dll',
+        'E:/dingkou/OSC15/opencv/build/x64/vc14/bin/opencv_world341.dll',
     ]
 
 
