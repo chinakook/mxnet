@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,19 +17,19 @@
 # specific language governing permissions and limitations
 # under the License.
 
-CPPEX_SRC = $(wildcard *.cpp)
-CPPEX_EXE = $(patsubst %.cpp, %, $(CPPEX_SRC))
 
-CFLAGS += -I../../include -I../../3rdparty/nnvm/include -I../../3rdparty/dmlc-core/include
-CPPEX_CFLAGS += -I../include
-CPPEX_EXTRA_LDFLAGS := -L. -lmxnet
+MXNET_ROOT=$(cd "$(dirname $0)/../../../../../"; pwd)
+CLASS_PATH=$MXNET_ROOT/scala-package/assembly/osx-x86_64-cpu/target/*:$MXNET_ROOT/scala-package/examples/target/*:$MXNET_ROOT/scala-package/examples/target/classes/lib/*:$MXNET_ROOT/scala-package/infer/target/*
 
-.PHONY: all clean
+# model dir and prefix
+MODEL_DIR=$1
+# input image
+INPUT_IMG=$2
+# which input image dir
+INPUT_DIR=$3
 
-all: $(CPPEX_EXE)
-
-$(CPPEX_EXE):% : %.cpp libmxnet.so ../include/mxnet-cpp/*.h
-	$(CXX) -std=c++0x $(CFLAGS) $(CPPEX_CFLAGS) -o $@ $(filter %.cpp %.a, $^) $(CPPEX_EXTRA_LDFLAGS)
-
-clean:
-	rm -f $(CPPEX_EXE)
+java -Xmx8G -cp $CLASS_PATH \
+	ml.dmlc.mxnetexamples.inferexample.objectdetector.SSDClassifierExample \
+	--model-path-prefix $MODEL_DIR \
+	--input-image $INPUT_IMG \
+	--input-dir $INPUT_DIR

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,19 +17,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-CPPEX_SRC = $(wildcard *.cpp)
-CPPEX_EXE = $(patsubst %.cpp, %, $(CPPEX_SRC))
+set -e
 
-CFLAGS += -I../../include -I../../3rdparty/nnvm/include -I../../3rdparty/dmlc-core/include
-CPPEX_CFLAGS += -I../include
-CPPEX_EXTRA_LDFLAGS := -L. -lmxnet
+MXNET_ROOT=$(cd "$(dirname $0)/../../.."; pwd)
 
-.PHONY: all clean
+data_path=$MXNET_ROOT/scripts/inferexample/models/resnet-152/
 
-all: $(CPPEX_EXE)
+image_path=$MXNET_ROOT/scripts/inferexample/images/
 
-$(CPPEX_EXE):% : %.cpp libmxnet.so ../include/mxnet-cpp/*.h
-	$(CXX) -std=c++0x $(CFLAGS) $(CPPEX_CFLAGS) -o $@ $(filter %.cpp %.a, $^) $(CPPEX_EXTRA_LDFLAGS)
+if [ ! -d "$data_path" ]; then
+  mkdir -p "$data_path"
+fi
 
-clean:
-	rm -f $(CPPEX_EXE)
+if [ ! -d "$image_path" ]; then
+  mkdir -p "$image_path"
+fi
+
+if [ ! -f "$data_path" ]; then
+  wget http://data.mxnet.io/models/imagenet-11k/resnet-152/resnet-152-0000.params -P $data_path
+  wget http://data.mxnet.io/models/imagenet-11k/resnet-152/resnet-152-symbol.json -P $data_path
+  wget http://data.mxnet.io/models/imagenet-11k/synset.txt -P $data_path
+  wget https://s3.amazonaws.com/model-server/inputs/kitten.jpg -P $image_path
+fi
