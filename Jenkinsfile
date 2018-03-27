@@ -141,6 +141,15 @@ try {
         }
       }
     },
+    'CPU: CentOS 7 MKLDNN': {
+      node('mxnetlinux-cpu') {
+        ws('workspace/build-centos7-mkldnn') {
+          init_git()
+          sh "ci/build.py --build --platform centos7_cpu /work/runtime_functions.sh build_centos7_mkldnn"
+          pack_lib('centos7_mkldnn')
+        }
+      }
+    },
     'GPU: CentOS 7': {
       node('mxnetlinux-cpu') {
         ws('workspace/build-centos7-gpu') {
@@ -383,6 +392,24 @@ try {
           init_git()
           unpack_lib('gpu', mx_lib)
           python3_gpu_ut('ubuntu_gpu')
+        }
+      }
+    },
+    'Python2: Quantize GPU': {
+      node('mxnetlinux-gpu-p3') {
+        ws('workspace/ut-python2-quantize-gpu') {
+          init_git()
+          unpack_lib('gpu', mx_lib)
+          sh "ci/build.py --nvidiadocker --build --platform ubuntu_gpu /work/runtime_functions.sh unittest_ubuntu_python2_quantization_gpu"
+        }
+      }
+    },
+    'Python3: Quantize GPU': {
+      node('mxnetlinux-gpu-p3') {
+        ws('workspace/ut-python3-quantize-gpu') {
+          init_git()
+          unpack_lib('gpu', mx_lib)
+          sh "ci/build.py --nvidiadocker --build --platform ubuntu_gpu /work/runtime_functions.sh unittest_ubuntu_python3_quantization_gpu"
         }
       }
     },
