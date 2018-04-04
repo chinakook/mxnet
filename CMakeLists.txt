@@ -502,7 +502,6 @@ if(USE_CUDA)
     mshadow_select_nvcc_arch_flags(NVCC_FLAGS_ARCH)
     string(REPLACE ";" " " NVCC_FLAGS_ARCH "${NVCC_FLAGS_ARCH}")
     set(CMAKE_CUDA_FLAGS "${NVCC_FLAGS_ARCH}")
-    set(CMAKE_CUDA_FLAGS_RELEASE "${NVCC_FLAGS_ARCH} -use_fast_math")
     list(APPEND mxnet_LINKER_LIBS cublas cufft cusolver curand)
     if(ENABLE_CUDA_RTC)
         list(APPEND mxnet_LINKER_LIBS nvrtc cuda)
@@ -651,10 +650,6 @@ target_link_libraries(mxnet PUBLIC dmlc)
 
 if(MSVC AND USE_MXNET_LIB_NAMING)
   set_target_properties(mxnet PROPERTIES OUTPUT_NAME "libmxnet")
-endif()
-
-if(USE_PROFILER)
-    add_definitions(-DMXNET_USE_PROFILER)
 endif()
 
 add_subdirectory(tests)
