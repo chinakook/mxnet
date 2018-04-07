@@ -164,6 +164,12 @@ def test_ndarray_reshape():
     assert same(tensor.reshape(-1).asnumpy(), true_res.asnumpy())
     assert same(tensor.reshape(8).asnumpy(), true_res.asnumpy())
 
+    assert same(tensor.reshape(0, -1).asnumpy(), true_res.reshape(2, 4).asnumpy())
+    assert same(tensor.reshape(-1, 4).asnumpy(), true_res.reshape(2, 4).asnumpy())
+    assert same(tensor.reshape(-2,).asnumpy(), true_res.reshape(2, 2, 2).asnumpy())
+    assert same(tensor.reshape(-3, -1).asnumpy(), true_res.reshape(4, 2).asnumpy())
+    assert same(tensor.reshape(-1, 4).reshape(0, -4, 2, -1).asnumpy(), true_res.reshape(2, 2, 2).asnumpy())
+
 
 @with_seed()
 def test_ndarray_choose():
@@ -343,7 +349,7 @@ def test_ndarray_slice():
     A = mx.nd.array(np.random.uniform(-10, 10, shape))
     A2 = A.asnumpy()
     assert same(A[3:8].asnumpy(), A2[3:8])
-    A2[3:8] *= 10;
+    A2[3:8] *= 10
     A[3:8] = A2[3:8]
     assert same(A[3:8].asnumpy(), A2[3:8])
 
@@ -354,11 +360,19 @@ def test_ndarray_slice():
     assert same(A[1,3:4,:,1:5].asnumpy(), A2[1,3:4,:,1:5])
 
     assert A[1,2,3,4,5].asscalar() == A2[1,2,3,4,5]
+    assert A[-1,-2,-3,-4,-5].asscalar() == A2[-1,-2,-3,-4,-5]
 
     a = mx.nd.array([[0, 1], [2, 3]])
     assert (a[[1, 1, 0], [0, 1, 0]].asnumpy() == [2, 3, 0]).all()
     assert (a[mx.nd.array([1, 1, 0]), mx.nd.array([0, 1, 0])].asnumpy() == [2, 3, 0]).all()
 
+    shape = (4, 4)
+    A = mx.nd.random.uniform(shape=shape)
+    A2 = A.asnumpy()
+    for i in range(-4, 0):
+        assert A[i, i].asscalar() == A2[i, i]
+        assert same(A[:, i].asnumpy(), A2[:, i])
+        assert same(A[i, :].asnumpy(), A2[i, :])
 
 @with_seed()
 def test_ndarray_crop():
@@ -1120,16 +1134,16 @@ def test_assign_a_row_to_ndarray():
     # assign a list
     v = np.random.random(W).astype(dtype).tolist()
     a_np[1] = v
-    a_nd[1] = v 
+    a_nd[1] = v
     assert same(a_np, a_nd.asnumpy())
 
     # assign a np.ndarray
     v = np.random.random(W).astype(dtype)
     a_np[2] = v
-    a_nd[2] = v 
+    a_nd[2] = v
     assert same(a_np, a_nd.asnumpy())
 
-    # assign by slice 
+    # assign by slice
     a_np[0, :] = a_np[1]
     a_nd[0, :] = a_nd[1]
     assert same(a_np, a_nd.asnumpy())
