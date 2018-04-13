@@ -89,18 +89,18 @@ tutorial) to `mx.cpu()`
 
 ## Row Sparse Format
 
-A RowSparseNDArray represents a multidimensional NDArray using two separate 1D arrays:
+A RowSparseNDArray represents a multidimensional NDArray of shape `[LARGE0, D1, .. , Dn]` using two separate 1D arrays:
 `data` and `indices`.
 
 - data: an NDArray of any dtype with shape `[D0, D1, ..., Dn]`.
 - indices: a 1D int64 NDArray with shape `[D0]` with values sorted in ascending order.
 
-The ``indices`` array stores the indices of the row slices with non-zeros,
+The ``indices`` array stores the indices of the row slices with **non-zeros**,
 while the values are stored in ``data`` array. The corresponding NDArray `dense` represented by RowSparseNDArray `rsp` has
 
 ``dense[rsp.indices[i], :, :, :, ...] = rsp.data[i, :, :, :, ...]``
 
-A RowSparseNDArray is typically used to represent non-zero row slices of a large NDArray of shape [LARGE0, D1, .. , Dn] where LARGE0 >> D0 and most row slices are zeros.
+A RowSparseNDArray is typically used to represent non-zero row slices of a large NDArray of shape `[LARGE0, D1, .. , Dn]` where LARGE0 >> D0 and most row slices are zeros.
 
 Given this two-dimension matrix:
 
@@ -174,9 +174,7 @@ b = mx.nd.sparse.row_sparse_array((data_np, indices_np), shape=shape)
 
 
 
-    {'a': 
-     <RowSparseNDArray 6x2 @cpu(0)>, 'b': 
-     <RowSparseNDArray 6x2 @cpu(0)>}
+`{'a':  <RowSparseNDArray 6x2 @cpu(0)>, 'b':   <RowSparseNDArray 6x2 @cpu(0)>}`<!--notebook-skip-line-->
 
 
 
@@ -210,7 +208,7 @@ d = mx.nd.array(a, dtype=np.float16)
 
 
 
-    (numpy.float32, numpy.float16)
+`(numpy.float32, numpy.float16)`<!--notebook-skip-line-->
 
 
 
@@ -351,7 +349,7 @@ g.copyto(f)
 
 
 
-    {'e.stype': 'row_sparse', 'f.stype': 'row_sparse', 'g.stype': 'default'}
+`{'e.stype': 'row_sparse', 'f.stype': 'row_sparse', 'g.stype': 'default'}`<!--notebook-skip-line-->
 
 
 
@@ -429,7 +427,7 @@ c = a + mx.nd.ones((5, 2))  # c will be a dense NDArray
 
 
 
-    {'b.stype': 'row_sparse', 'c.stype': 'default'}
+`{'b.stype': 'row_sparse', 'c.stype': 'default'}`<!--notebook-skip-line-->
 
 
 
@@ -453,7 +451,7 @@ e = mx.nd.log(a, out=e) # dense operator with a sparse output
 
 
 
-    {'a.stype': 'row_sparse', 'd.stype': 'default', 'e.stype': 'row_sparse'}
+`{'a.stype': 'row_sparse', 'd.stype': 'default', 'e.stype': 'row_sparse'}` <!--notebook-skip-line-->
 
 
 

@@ -15,18 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
-#read in the txt file
-import pandas as pd
-import numpy as np
+package AI::MXNet::LinAlg::NDArray;
+use strict;
+use warnings;
 
-#read in the data
-df = pd.read_csv("../data/electricity.txt", sep=",", header = None)
+sub AUTOLOAD {
+    my $sub = $AI::MXNet::LinAlg::NDArray::AUTOLOAD;
+    $sub =~ s/.*:://;
+    $sub = "_linalg_$sub";
+    shift;
+    return AI::MXNet::NDArray->$sub(@_);
+}
 
-#extract feature values
-feature_df = df.iloc[:, :].astype(float)
-
-#convert to numpy matrix
-x = feature_df.as_matrix()
-
-#save files
-np.save("../data/electric.npy", x)
+1;
