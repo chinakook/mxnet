@@ -44,8 +44,7 @@ void GatherPointCompute<gpu>(const nnvm::NodeAttrs& attrs,
 	auto *stream = ctx.get_stream<gpu>();
 	auto s = mshadow::Stream<mxnet::gpu>::GetStream(stream);
 	dim3 grid_dim = dim3(2, 8, 1);
-	dim3 block_dim = dim3(512, 1, 1);
-	cuda::gatherpointKernel<<<grid_dim, block_dim, 0, s>>>(
+	cuda::gatherpointKernel<<<grid_dim, 512, 0, s>>>(
 		B, N, M, inputs[0].dptr<float>(), inputs[1].dptr<int>(), outputs[0].dptr<float>());
 }
 
@@ -65,8 +64,7 @@ void GatherPointGradCompute<gpu>(const nnvm::NodeAttrs& attrs,
 	auto *stream = ctx.get_stream<gpu>();
 	auto s = mshadow::Stream<mxnet::gpu>::GetStream(stream);
 	dim3 grid_dim = dim3(2, 8, 1);
-	dim3 block_dim = dim3(512, 1, 1);
-	cuda::scatteraddpointKernel<<<grid_dim, block_dim, 0, s>>>(
+	cuda::scatteraddpointKernel<<<grid_dim, 512, 0, s>>>(
 		B, N, M, out_grad.dptr<float>(), idx.dptr<int>(), in_grad.dptr<float>());
 }
 
@@ -77,4 +75,4 @@ NNVM_REGISTER_OP(_backward_GatherPoint)
 .set_attr<FCompute>("FCompute<gpu>", GatherPointGradCompute<gpu>);
 
 } // namespace op
-} // namespace mshadow
+} // namespace mxnet

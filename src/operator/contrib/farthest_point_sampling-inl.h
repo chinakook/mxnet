@@ -63,20 +63,6 @@ namespace op {
 		const OpContext& ctx, const std::vector<TBlob>& inputs,
 		const std::vector<OpReqType>& req,
 		const std::vector<TBlob>& outputs) {
-// 	const int B = inputs[0].size(0);
-// 	const int N = inputs[0].size(1);
-//     const FarthestPointSamplingParam& param = nnvm::get<FarthestPointSamplingParam>(attrs.parsed);
-
-// 	auto *stream = ctx.get_stream<gpu>();
-// 	auto s = mshadow::Stream<mxnet::gpu>::GetStream(stream);
-// using namespace mshadow;
-//     Shape<2> shape;
-//     shape.shape_[0] = B;
-//     shape.shape_[1] = N;
-//     printf("FPS_BEGIN\n");
-//     mshadow::Shape2(B, N);
-//     Tensor<gpu, 2, float> tmp = ctx.requested[0].get_space_typed<gpu, 2, float>(shape, stream);
-		//LogUnimplementedOp(attrs, ctx, inputs, req, outputs);
 	}
 
 	template<typename xpu>

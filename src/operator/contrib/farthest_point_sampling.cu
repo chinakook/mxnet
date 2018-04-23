@@ -90,19 +90,13 @@ CHECK_GT(ctx.requested.size(), 0);
 
 	auto *stream = ctx.get_stream<gpu>();
 	auto s = mshadow::Stream<mxnet::gpu>::GetStream(stream);
-auto shape = mshadow::Shape2(B, N);
-    //printf("FPS_BEGIN %d %d %d\n", B, N, param.npoints);
-    //Tensor<gpu, 1, char> tmp1 = ctx.requested[0].get_space_typed<gpu, 1, char>( mshadow::Shape1(B*N), stream);
-    Tensor<gpu, 2, float> tmp = ctx.requested[0].get_space_typed<gpu, 2, float>(shape, stream);
-    Fill<false>(stream, TBlob(reinterpret_cast<nnvm::dim_t*>(tmp.dptr_), mshadow::Shape1(B*N), gpu::kDevMask),
-            kWriteTo, 1e10);
-    //printf("Tensor OK");
+    auto tmp_shape = mshadow::Shape2(32, N);
 
-	dim3 grid_dim = dim3(32, 1, 1);
-	dim3 block_dim = dim3(512, 1, 1);
-	cuda::farthestpointsamplingKernel<<<grid_dim, block_dim, 0, s>>>(
+    Tensor<gpu, 2, float> tmp = ctx.requested[0].get_space_typed<gpu, 2, float>(tmp_shape, stream);
+    // Fill<false>(stream, TBlob(reinterpret_cast<nnvm::dim_t*>(tmp.dptr_), tmp_shape, gpu::kDevMask), kWriteTo, 1e 10);
+
+	cuda::farthestpointsamplingKernel<<<32, 512, 0, s>>>(
 		B, N, param.npoints, inputs[0].dptr<float>(), tmp.dptr_, outputs[0].dptr<int>());
-    //printf("FPS_END\n");
 }
 
 template<>
@@ -121,4 +115,4 @@ NNVM_REGISTER_OP(_backward_FarthestPointSampling)
 .set_attr<FCompute>("FCompute<gpu>", FarthestPointSamplingGradCompute<gpu>);
 
 } // namespace op
-} // namespace mshadow
+} // namespace mxnet
