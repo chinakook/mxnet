@@ -6,28 +6,28 @@ namespace mxnet {
 	{
 		for (int i = 0; i < b; ++i)
 		{
-      int old = 0;
-      idxs[i*m + 0] = old;
-      for(int j = 0; j < n; ++j)
-      {
-        temp[j] = std::numeric_limits<float>::max();
-      }
+			int old = 0;
+			idxs[i * m + 0] = old;
+			for (int j = 0; j < n; ++j)
+			{
+				temp[j] = std::numeric_limits<float>::max();
+			}
 
 			for (int k = 1; k < m; ++k)
 			{
-        float x1 = dataset[(i*n + old) * 3 + 0];
-        float y1 = dataset[(i*n + old) * 3 + 1];
-        float z1 = dataset[(i*n + old) * 3 + 2];
+				float x1 = dataset[(i * n + old) * 3 + 0];
+				float y1 = dataset[(i * n + old) * 3 + 1];
+				float z1 = dataset[(i * n + old) * 3 + 2];
 
 				float max = -1;
 				int jmax = 0;
 				for (int j = 0; j < n; ++j)
 				{
-					float x0 = dataset[(i*n + j) * 3 + 0];
-					float y0 = dataset[(i*n + j) * 3 + 1];
-					float z0 = dataset[(i*n + j) * 3 + 2];
-					float d = (x0 - x1)*(x0 - x1) + (y0 - y1)*(y0 - y1) + (z0 - z1)*(z0 - z1);
-					
+					float x0 = dataset[(i * n + j) * 3 + 0];
+					float y0 = dataset[(i * n + j) * 3 + 1];
+					float z0 = dataset[(i * n + j) * 3 + 2];
+					float d = (x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1) + (z0 - z1) * (z0 - z1);
+
 					temp[j] = std::min(temp[j], d);
 					if (temp[j] > max)
 					{
@@ -35,16 +35,14 @@ namespace mxnet {
 						jmax = j;
 					}
 				}
-        old = jmax;
-				idxs[i*m + k] = old;
+				old = jmax;
+				idxs[i * m + k] = old;
 			}
-      
-
 		}
-
 	}
 
-namespace op {
+	namespace op
+	{
 
 	template<>
 	void FarthestPointSamplingCompute<cpu>(const nnvm::NodeAttrs& attrs,
@@ -62,7 +60,11 @@ namespace op {
 		auto tmp_shape = mshadow::Shape2(32, N);
 
 		Tensor<cpu, 2, float> tmp = ctx.requested[0].get_space_typed<cpu, 2, float>(tmp_shape, stream);
+<<<<<<< HEAD
 		//Fill<false>(stream, TBlob(reinterpret_cast<nnvm::dim_t*>(tmp.dptr_), tmp_shape, cpu::kDevMask), kWriteTo, 1e10f);
+=======
+		Fill<false>(stream, TBlob(reinterpret_cast<nnvm::dim_t*>(tmp.dptr_), tmp_shape, gpu::kDevMask), kWriteTo, 1e10);
+>>>>>>> ba1c81471338d7e172d0fc99ca20eb6571c65b04
 
 		farthestpointsamplingKernel(
 			B, N, param.npoints, inputs[0].dptr<float>(), tmp.dptr_, outputs[0].dptr<int>());
