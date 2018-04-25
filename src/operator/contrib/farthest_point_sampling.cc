@@ -60,11 +60,7 @@ namespace mxnet {
 		auto tmp_shape = mshadow::Shape2(32, N);
 
 		Tensor<cpu, 2, float> tmp = ctx.requested[0].get_space_typed<cpu, 2, float>(tmp_shape, stream);
-<<<<<<< HEAD
 		//Fill<false>(stream, TBlob(reinterpret_cast<nnvm::dim_t*>(tmp.dptr_), tmp_shape, cpu::kDevMask), kWriteTo, 1e10f);
-=======
-		Fill<false>(stream, TBlob(reinterpret_cast<nnvm::dim_t*>(tmp.dptr_), tmp_shape, gpu::kDevMask), kWriteTo, 1e10);
->>>>>>> ba1c81471338d7e172d0fc99ca20eb6571c65b04
 
 		farthestpointsamplingKernel(
 			B, N, param.npoints, inputs[0].dptr<float>(), tmp.dptr_, outputs[0].dptr<int>());
