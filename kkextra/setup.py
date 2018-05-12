@@ -71,8 +71,8 @@ else:
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_core.dll',
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_intel_thread.dll',
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_rt.dll',
-        'E:/dingkou/OSC15/opencv/build/x64/vc14/bin/opencv_ffmpeg341_64.dll',
-        'E:/dingkou/OSC15/opencv/build/x64/vc14/bin/opencv_world341.dll',
+        'D:/proj/dev/opencv341/build/x64/vc14/bin/opencv_ffmpeg341_64.dll',
+        'D:/proj/dev/opencv341/build/x64/vc14/bin/opencv_world341.dll',
     ]
 
 
