@@ -28,6 +28,89 @@ from mxnet.base import py_str, MXNetError
 from common import setup_module, with_seed
 import unittest
 
+def check_rnn_consistency(cell1, cell2, T, N, I, H):
+    dshape = (N, T, I)
+    data = mx.sym.Variable('data')
+
+    Y1, _ = cell1.unroll(T, data, layout='NTC', merge_outputs=True)
+    mod1 = mx.mod.Module(Y1, label_names=None, context=default_context())
+    mod1.bind(data_shapes=[('data', dshape)], label_shapes=None, inputs_need_grad=True)
+
+    Y2, _ = cell2.unroll(T, data, layout='NTC', merge_outputs=True)
+    mod2 = mx.mod.Module(Y2, label_names=None, context=default_context())
+    mod2.bind(data_shapes=[('data', dshape)], label_shapes=None, inputs_need_grad=True)
+
+    mod1.init_params()
+    args, auxs = mod1.get_params()
+    args = cell1.unpack_weights(args)
+    args = cell2.pack_weights(args)
+    mod2.set_params(args, auxs)
+
+    x = mx.random.uniform(shape=dshape)
+    batch=mx.io.DataBatch(data=[x])
+    # check inference
+    mod1.forward(batch, is_train=False)
+    mod2.forward(batch, is_train=False)
+    assert_allclose(mod1.get_outputs()[0].asnumpy(), mod2.get_outputs()[0].asnumpy(), rtol=1e-2, atol=1e-4)
+
+    # check training
+    mod1.forward(batch, is_train=True)
+    mod2.forward(batch, is_train=True)
+    assert_allclose(mod1.get_outputs()[0].asnumpy(), mod2.get_outputs()[0].asnumpy(), rtol=1e-2, atol=1e-4)
+
+    dy = mx.random.uniform(shape=mod1.get_outputs()[0].shape)
+    mod1.backward(out_grads=[dy])
+    mod2.backward(out_grads=[dy])
+    assert_allclose(mod1.get_input_grads()[0].asnumpy(), mod2.get_input_grads()[0].asnumpy(), rtol=1e-2, atol=1e-4)
+
+@with_seed()
+def test_lstm_sym():
+    T, N, I, H = 5, 32, 800, 800
+    fused = mx.rnn.FusedRNNCell(H, num_layers=3, mode='lstm', get_next_state=True, prefix='')
+    stack = mx.rnn.SequentialRNNCell()
+    stack.add(mx.rnn.LSTMCell(H, prefix='l0_'))
+    stack.add(mx.rnn.LSTMCell(H, prefix='l1_'))
+    stack.add(mx.rnn.LSTMCell(H, prefix='l2_'))
+    check_rnn_consistency(fused, stack, T, N, I, H)
+    check_rnn_consistency(stack, fused, T, N, I, H)
+
+@with_seed()
+def test_lstm_bidirectional():
+    T, N, I, H = 5, 20, 800, 800
+    fused = mx.rnn.FusedRNNCell(H, num_layers=2, mode='lstm',
+                                bidirectional=True, get_next_state=True, prefix='')
+
+    stack = mx.rnn.SequentialRNNCell()
+    stack.add(mx.rnn.BidirectionalCell(
+                mx.rnn.LSTMCell(H, prefix='l0_'),
+                mx.rnn.LSTMCell(H, prefix='r0_'),
+                output_prefix='bi_lstm_0_'))
+    stack.add(mx.rnn.BidirectionalCell(
+                mx.rnn.LSTMCell(H, prefix='l1_'),
+                mx.rnn.LSTMCell(H, prefix='r1_'),
+                output_prefix='bi_lstm_1_'))
+
+    check_rnn_consistency(stack, fused, T, N, I, H)
+    check_rnn_consistency(fused, stack, T, N, I, H)
+
+# Currently, fused LSTM operator doesn't support dropout.
+# Will change this test after dropout is supported
+@with_seed()
+def test_lstm_dropout():
+    X = mx.sym.Variable('x')
+    Params = mx.sym.Variable('params')
+    HX = mx.sym.Variable('state')
+    CX = mx.sym.Variable('state_cell')
+    T, N, I, H = 300, 20, 800, 800
+    rnn = mx.sym.RNN(data=X, parameters=Params, state=HX, state_cell=CX,
+                     state_size=H, num_layers=5, mode='lstm', p=0.5, state_outputs=True, name='LSTM')
+    exe = rnn.simple_bind(ctx=mx.cpu(), x=(T, N, I))
+    try:
+        out = exe.forward(is_train=False)
+        out[0].wait_to_read()
+        assert False  # should not reach here
+    except mx.base.MXNetError as err:
+        assert str(err).find('Dropout is not supported at the moment') != -1
 
 def np_softmax(x, axis=-1):
     # fix for old numpy on Travis not supporting keepdims
@@ -1843,6 +1926,10 @@ def test_reduce():
             else:
                 b = mx_reduce_sym(a, axis=axes, keepdims=keepdims)
             dat_npy = np.random.rand(*shape)
+            # Test with both negative and positive values (randomly).  Avoid having both in the same
+            # test, which can be problematic for error checking due to near-zero values.
+            if np.random.rand() > 0.5:
+                dat_npy = -dat_npy
             if nan_prob > 0:
                 dat_npy[np.random.rand(*shape) < nan_prob] = np.nan
             sum_groundtruth = np.array(numpy_reduce_func(dat_npy, axis=axes, keepdims=keepdims))
@@ -1870,38 +1957,43 @@ def test_reduce():
 
     test_none_axis = [True, False]
     for test_none in test_none_axis:
-      test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.sum),
-                        lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
-                          outgrad.reshape(keepdim_shape),
-                        mx.symbol.sum, test_none_axis=test_none)
-      test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.mean),
-                        lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
-                          outgrad.reshape(keepdim_shape)/(data.size/outdata.size),
-                        mx.symbol.mean, test_none_axis=test_none)
-      test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.prod),
-                        lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
-                          outgrad.reshape(keepdim_shape) * (outdata.reshape(keepdim_shape) / data),
-                        mx.symbol.prod, test_none_axis=test_none)
-      test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.nansum),
-                        lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
-                          np.where(np.isnan(data), 0, outgrad.reshape(keepdim_shape)),
-                        mx.symbol.nansum, 0.3, test_none_axis=test_none)
-      test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.nanprod),
-                        lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
-                          np.where(np.isnan(data), 0, outgrad.reshape(keepdim_shape) * (outdata.reshape(keepdim_shape) / data)),
-                        mx.symbol.nanprod, 0.3, test_none_axis=test_none)
-      test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.max),
-                        lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
-                          outgrad.reshape(keepdim_shape) * (np.equal(data, outdata.reshape(keepdim_shape)).astype(np.float)),
-                        mx.symbol.max, test_none_axis=test_none)
-      test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.min),
-                        lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
-                          outgrad.reshape(keepdim_shape) * (np.equal(data, outdata.reshape(keepdim_shape)).astype(np.float)),
-                        mx.symbol.min, test_none_axis=test_none)
-      test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.linalg.norm),
-                        lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
-                          outgrad.reshape(keepdim_shape) * (data / outdata.reshape(keepdim_shape)),
-                        mx.symbol.norm, test_exclude=False, test_none_axis=test_none)
+        test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.sum),
+                          lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
+                            outgrad.reshape(keepdim_shape),
+                          mx.symbol.sum, test_none_axis=test_none)
+        test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.mean),
+                          lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
+                            outgrad.reshape(keepdim_shape)/(data.size/outdata.size),
+                          mx.symbol.mean, test_none_axis=test_none)
+        test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.prod),
+                          lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
+                            outgrad.reshape(keepdim_shape) * (outdata.reshape(keepdim_shape) / data),
+                          mx.symbol.prod, test_none_axis=test_none)
+        test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.nansum),
+                          lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
+                            np.where(np.isnan(data), 0, outgrad.reshape(keepdim_shape)),
+                          mx.symbol.nansum, 0.3, test_none_axis=test_none)
+        test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.nanprod),
+                          lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
+                            np.where(np.isnan(data), 0, outgrad.reshape(keepdim_shape) *
+                                   (outdata.reshape(keepdim_shape) / data)),
+                          mx.symbol.nanprod, 0.3, test_none_axis=test_none)
+        # grad of max and min are sensitive to the precision of the calculation.
+        # Force numpy to match mxnet's float32.
+        test_reduce_inner(lambda data, axis, keepdims:np_reduce(np.float32(data), axis, keepdims, np.max),
+                          lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
+                            outgrad.reshape(keepdim_shape) *
+                            (np.equal(np.float32(data), outdata.reshape(keepdim_shape))),
+                          mx.symbol.max)
+        test_reduce_inner(lambda data, axis, keepdims:np_reduce(np.float32(data), axis, keepdims, np.min),
+                          lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
+                            outgrad.reshape(keepdim_shape) *
+                            (np.equal(np.float32(data), outdata.reshape(keepdim_shape))),
+                          mx.symbol.min)
+        test_reduce_inner(lambda data, axis, keepdims:np_reduce(data, axis, keepdims, np.linalg.norm),
+                          lambda outgrad, data, outdata, axis, keepdims, keepdim_shape:
+                            outgrad.reshape(keepdim_shape) * (data / outdata.reshape(keepdim_shape)),
+                          mx.symbol.norm, test_exclude=False, test_none_axis=test_none)
 
 
 @with_seed()
@@ -5873,6 +5965,7 @@ def test_op_output_names_monitor():
                             name='pooling')
     check_name(us_sym, ['pooling_output'])
 
+
 @with_seed()
 def test_activation():
     shape=(9, 10)
@@ -5913,6 +6006,169 @@ def test_activation():
         # Finite difference testing
         finite_diff_unary_op(
             name, op[0], shape, op[3], op[4], rtol_fd, atol_fd, num_eps)
+
+
+def test_context_num_gpus():
+    try:
+        # Note: the test is run both on GPU and CPU hosts, so that we can not assert
+        # on a specific number here.
+        assert mx.context.num_gpus() >= 0
+    except mx.MXNetError as e:
+        # Note: On a CPU only host CUDA sometimes is not able to determine the number
+        # of GPUs
+        if str(e).find("CUDA") == -1:
+            raise e
+
+
+@with_seed()
+def test_op_roi_align():
+    # Adapted from https://github.com/wkcn/MobulaOP/blob/master/tests/test_roi_align_op.py
+    def bilinear_interpolate(bottom, height, width, y, x):
+        if y < -1.0 or y > height or x < -1.0 or x > width:
+            return 0.0, []
+        x = max(0.0, x)
+        y = max(0.0, y)
+        x_low = int(x)
+        y_low = int(y)
+        if x_low >= width - 1:
+            x_low = x_high = width - 1
+            x = x_low
+        else:
+            x_high = x_low + 1
+
+        if y_low >= height - 1:
+            y_low = y_high = height - 1
+            y = y_low
+        else:
+            y_high = y_low + 1
+
+        ly = y - y_low
+        lx = x - x_low
+        hy = 1.0 - ly
+        hx = 1.0 - lx
+
+        v1 = bottom[y_low, x_low]
+        v2 = bottom[y_low, x_high]
+        v3 = bottom[y_high, x_low]
+        v4 = bottom[y_high, x_high]
+
+        '''
+        ----------->x
+        |hx hy | lx hy
+        |------+------
+        |hx ly | lx ly
+        V
+        y
+        v1|v2
+        --+--
+        v3|v4
+        '''
+        w1 = hy * hx
+        w2 = hy * lx
+        w3 = ly * hx
+        w4 = ly * lx
+
+        val = w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4
+        grad = [(y_low, x_low, w1), (y_low, x_high, w2),
+                (y_high, x_low, w3), (y_high, x_high, w4)
+               ]
+        return val, grad
+
+    def roialign_forward_backward(data, rois, pooled_size, spatial_scale, sampling_ratio, dy):
+        N, C, H, W = data.shape
+        R = rois.shape[0]
+        PH, PW = pooled_size
+        assert len(rois.shape) == 2
+        assert rois.shape[1] == 5
+
+        out = np.zeros((R, C, PH, PW))
+        dx = np.zeros_like(data)
+        drois = np.zeros_like(rois)
+
+        for r in range(R):
+            batch_ind = int(rois[r, 0])
+            sw, sh, ew, eh = rois[r, 1:5] * spatial_scale
+            roi_w = max(ew - sw, 1.0)
+            roi_h = max(eh - sh, 1.0)
+            bin_h = roi_h * 1.0 / PH
+            bin_w = roi_w * 1.0 / PW
+            bdata = data[batch_ind]
+            if sampling_ratio > 0:
+                roi_bin_grid_h = roi_bin_grid_w = sampling_ratio
+            else:
+                roi_bin_grid_h = int(np.ceil(roi_h * 1.0 / PH))
+                roi_bin_grid_w = int(np.ceil(roi_w * 1.0 / PW))
+            count = roi_bin_grid_h * roi_bin_grid_w
+            for c in range(C):
+                for ph in range(PH):
+                    for pw in range(PW):
+                        val = 0.0
+                        for iy in range(roi_bin_grid_h):
+                            y = sh + ph * bin_h + (iy + 0.5) * bin_h / roi_bin_grid_h
+                            for ix in range(roi_bin_grid_w):
+                                x = sw + pw * bin_w + (ix + 0.5) * bin_w / roi_bin_grid_w
+                                v, g = bilinear_interpolate(bdata[c], H, W, y, x)
+                                val += v
+                                # compute grad
+                                for qy, qx, qw in g:
+                                    dx[batch_ind, c, qy, qx] += dy[r, c, ph, pw] * qw * 1.0 / count
+
+                        out[r, c, ph, pw] = val * 1.0 / count
+        return out, [dx, drois]
+
+    def test_roi_align_value():
+        ctx=default_context()
+        dtype = np.float32
+
+        dlen = 224
+        N, C, H, W = 5, 3, 16, 16
+        assert H == W
+        R = 7
+        pooled_size = (3, 4)
+
+        spatial_scale = H * 1.0 / dlen
+        sampling_ratio = 0
+        data = mx.nd.array(np.arange(N*C*W*H).reshape((N,C,H,W)), ctx=ctx, dtype = dtype)
+        # data = mx.nd.random.uniform(0, 1, (N, C, H, W), dtype = dtype)
+        center_xy = mx.nd.random.uniform(0, dlen, (R, 2), ctx=ctx, dtype = dtype)
+        wh = mx.nd.random.uniform(0, dlen, (R, 2), ctx=ctx, dtype = dtype)
+        batch_ind = mx.nd.array(np.random.randint(0, N, size = (R,1)), ctx=ctx)
+        pos = mx.nd.concat(center_xy - wh / 2, center_xy + wh / 2, dim = 1)
+        rois = mx.nd.concat(batch_ind, pos, dim = 1)
+
+        data.attach_grad()
+        rois.attach_grad()
+        with mx.autograd.record():
+            output = mx.nd.contrib.ROIAlign(data, rois, pooled_size=pooled_size,
+                    spatial_scale=spatial_scale)
+        dy = mx.nd.random.uniform(-1, 1, (R, C) + pooled_size, ctx=ctx, dtype = dtype)
+        output.backward(dy)
+        real_output, [dx, drois] = roialign_forward_backward(data.asnumpy(), rois.asnumpy(), pooled_size, spatial_scale, sampling_ratio, dy.asnumpy())
+        assert np.allclose(output.asnumpy(), real_output)
+        # It seems that the precision between Cfloat and Pyfloat is different.
+        assert np.allclose(data.grad.asnumpy(), dx, atol = 1e-5), np.abs(data.grad.asnumpy() - dx).max()
+        assert np.allclose(rois.grad.asnumpy(), drois)
+
+    # modified from test_roipooling()
+    def test_roi_align_autograd():
+        ctx=default_context()
+        data = mx.symbol.Variable(name='data')
+        rois = mx.symbol.Variable(name='rois')
+        test = mx.symbol.contrib.ROIAlign(data=data, rois=rois, pooled_size=(4, 4), spatial_scale=1)
+
+        x1 = np.random.rand(4, 1, 12, 12).astype('float64')
+        x2 = np.array([[0, 1.1, 1.1, 6.2, 6.2], [2, 6.1, 2.1, 8.2, 11.2],
+                       [1, 3.1, 1.1, 5.2, 10.2]], dtype='float64')
+
+        check_numeric_gradient(sym=test, location=[x1, x2],
+                               grad_nodes={'data':'write', 'rois':'null'},
+                               numeric_eps=1e-4, rtol=1e-1, atol=1e-4, ctx=ctx)
+        check_numeric_gradient(sym=test, location=[x1, x2],
+                               grad_nodes={'data':'add', 'rois':'null'},
+                               numeric_eps=1e-4, rtol=1e-1, atol=1e-4, ctx=ctx)
+
+    test_roi_align_value()
+    test_roi_align_autograd()
 
 
 if __name__ == '__main__':
