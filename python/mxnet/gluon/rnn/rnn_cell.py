@@ -81,7 +81,7 @@ def _format_sequence(length, inputs, layout, merge, in_layout=None):
             F = symbol
         else:
             F = ndarray
-            batch_size = inputs[0].shape[batch_axis]
+            batch_size = inputs[0].shape[0]
         if merge is True:
             inputs = F.stack(*inputs, axis=axis)
             in_axis = axis
