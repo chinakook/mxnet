@@ -93,7 +93,7 @@ echo ${libs} | sed -e 's/,/ /g' | xargs md5sum
 }
 
 def docker_run(platform, function_name, use_nvidia, shared_mem = '500m') {
-  def command = "ci/build.py --download-docker-cache --docker-cache-bucket ${env.DOCKER_CACHE_BUCKET} %USE_NVIDIA% --platform %PLATFORM% --shm-size %SHARED_MEM% /work/runtime_functions.sh %FUNCTION_NAME%"
+  def command = "ci/build.py --docker-registry ${env.DOCKER_CACHE_REGISTRY} %USE_NVIDIA% --platform %PLATFORM% --shm-size %SHARED_MEM% /work/runtime_functions.sh %FUNCTION_NAME%"
   command = command.replaceAll('%USE_NVIDIA%', use_nvidia ? '--nvidiadocker' : '')
   command = command.replaceAll('%PLATFORM%', platform)
   command = command.replaceAll('%FUNCTION_NAME%', function_name)
@@ -821,28 +821,6 @@ try {
             init_git()
             unpack_lib('gpu')
             docker_run('ubuntu_gpu', 'integrationtest_ubuntu_gpu_dist_kvstore', true)
-          }
-        }
-      }
-    },
-    'tutorial tests Python 2 GPU': {
-      node('mxnetlinux-gpu') {
-        ws('workspace/it-tutorials-py2') {
-          timeout(time: max_time, unit: 'MINUTES') {
-            init_git()
-            unpack_lib('gpu')
-            docker_run('ubuntu_gpu', 'tutorialtest_ubuntu_python2_gpu', true, '3g')
-          }
-        }
-      }
-    },
-    'tutorial tests Python 3 GPU': {
-      node('mxnetlinux-gpu') {
-        ws('workspace/it-tutorials-py3') {
-          timeout(time: max_time, unit: 'MINUTES') {
-            init_git()
-            unpack_lib('gpu')
-            docker_run('ubuntu_gpu', 'tutorialtest_ubuntu_python3_gpu', true, '3g')
           }
         }
       }
