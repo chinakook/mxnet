@@ -1,5 +1,5 @@
 var versionSelect   = defaultVersion = 'v1.2.0';
-var deviceSelect    = 'Linux';
+var platformSelect    = 'Linux';
 var languageSelect  = 'Python';
 var processorSelect = 'CPU';
 var environSelect   = 'Pip';
@@ -8,18 +8,28 @@ $(document).ready(function () {
     function label(lbl) {
         return lbl.replace(/[ .]/g, '-').toLowerCase();
     }
+   
+    function urlSearchParams(searchString) {
+        let urlDict = new Map();
+        let searchParams = searchString.substring(1).split("&");
+        searchParams.forEach(function(element) {
+            kvPair = element.split("=");
+            urlDict.set(kvPair[0], kvPair[1]);
+        });
+        return urlDict;
+    }
 
     function setSelects(){
-        let urlParams = new URLSearchParams(window.location.search);
+        let urlParams = urlSearchParams(window.location.search);
         if (urlParams.get('version'))
             versionSelect = urlParams.get('version');
         $('li a:contains(' + versionSelect + ')').parent().siblings().removeClass('active');
         $('li a:contains(' + versionSelect + ')').parent().addClass('active');
         $('.current-version').html( versionSelect + ' <span class="caret"></span></button>' );
-        if (urlParams.get('device'))
-            deviceSelect = urlParams.get('device');
-        $('button:contains(' + deviceSelect + ')').siblings().removeClass('active');
-        $('button:contains(' + deviceSelect + ')').addClass('active');
+        if (urlParams.get('platform'))
+            platformSelect = urlParams.get('platform');
+        $('button:contains(' + platformSelect + ')').siblings().removeClass('active');
+        $('button:contains(' + platformSelect + ')').addClass('active');
         if (urlParams.get('language'))
             languageSelect = urlParams.get('language');
         $('button:contains(' + languageSelect + ')').siblings().removeClass('active');
@@ -33,11 +43,11 @@ $(document).ready(function () {
         $('button:contains(' + environSelect + ')').siblings().removeClass('active');
         $('button:contains(' + environSelect + ')').addClass('active');
         showContent();
-        if (window.location.href.includes("/install/index.html")) {
-            if (versionSelect.includes(defaultVersion)) {
-                history.pushState(null, null, '/install/index.html?device=' + deviceSelect + '&language=' + languageSelect + '&processor=' + processorSelect);
+        if (window.location.href.indexOf("/install/index.html") >= 0) {
+            if (versionSelect.indexOf(defaultVersion) >= 0) {
+                history.pushState(null, null, '/install/index.html?platform=' + platformSelect + '&language=' + languageSelect + '&processor=' + processorSelect);
             } else {
-                history.pushState(null, null, '/install/index.html?version=' + versionSelect + '&device=' + deviceSelect + '&language=' + languageSelect + '&processor=' + processorSelect);
+                history.pushState(null, null, '/install/index.html?version=' + versionSelect + '&platform=' + platformSelect + '&language=' + languageSelect + '&processor=' + processorSelect);
             }
         } 
     }
@@ -56,23 +66,23 @@ $(document).ready(function () {
     setSelects();
     function setContent() {
         var el = $(this);
-        let urlParams = new URLSearchParams(window.location.search);
+        let urlParams = urlSearchParams(window.location.search);
         el.siblings().removeClass('active');
         el.addClass('active');
         if ($(this).hasClass("versions")) {
             $('.current-version').html( $(this).text() + ' <span class="caret"></span></button>' );
-            if (!$(this).text().includes(defaultVersion)) {
-                if (!window.location.search.includes("version")) {
+            if ($(this).text().indexOf(defaultVersion) < 0) {
+                if (window.location.search.indexOf("version") < 0) {
                     history.pushState(null, null, '/install/index.html' + window.location.search.concat( '&version=' + $(this).text() ));
                 } else {
                     history.pushState(null, null, '/install/index.html' + window.location.search.replace( urlParams.get('version'), $(this).text() ));
                 }
-            } else if (window.location.search.includes("version")) {
+            } else if (window.location.search.indexOf("version") >= 0) {
                   history.pushState(null, null, '/install/index.html' + window.location.search.replace( 'version', 'prev' ));
               }
         }
-        else if ($(this).hasClass("Devices")) {
-            history.pushState(null, null, '/install/index.html' + window.location.search.replace( urlParams.get('device'), $(this).text() ));
+        else if ($(this).hasClass("platforms")) {
+            history.pushState(null, null, '/install/index.html' + window.location.search.replace( urlParams.get('platform'), $(this).text() ));
         }
         else if ($(this).hasClass("languages")) {
             history.pushState(null, null, '/install/index.html' + window.location.search.replace( urlParams.get('language'), $(this).text() ));
