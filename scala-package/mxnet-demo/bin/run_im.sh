@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -16,21 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+#!/bin/bash
+CURR_DIR=$(cd $(dirname $0)/../; pwd)
 
-# build and install are separated so changes to build don't invalidate
-# the whole docker cache for the image
-
-set -ex
-pushd .
-# This environment variable comes from the docker file
-echo "Downloading android SDK rev ${ANDROID_NDK_REVISION}"
-curl -O https://dl.google.com/android/repository/android-ndk-r${ANDROID_NDK_REVISION}-linux-x86_64.zip && \
-unzip ./android-ndk-r${ANDROID_NDK_REVISION}-linux-x86_64.zip && \
-cd android-ndk-r${ANDROID_NDK_REVISION} && \
-./build/tools/make_standalone_toolchain.py \
-    --stl=libc++ \
-    --arch arm64 \
-    --api 21 \
-    --install-dir=${CROSS_ROOT} && \
-
-popd
+CLASSPATH=$CLASSPATH:$CURR_DIR/target/*:$CLASSPATH:$CURR_DIR/target/classes/lib/*
+java -Xmx8G  -cp $CLASSPATH sample.ImageClassificationExample
