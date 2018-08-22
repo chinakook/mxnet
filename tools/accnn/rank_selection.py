@@ -21,7 +21,7 @@ import utils
 import math
 import sys
 
-from mxnet.base import xrange
+from six.moves import xrange
 
 
 def calc_complexity(ishape, node):

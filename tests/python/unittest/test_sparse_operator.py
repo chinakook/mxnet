@@ -1424,7 +1424,7 @@ def test_sparse_dot():
 
 @with_seed()
 def test_sparse_dot_determinism():
-    def test_dot_determinism(lhs_stype, rhs_stype, lhs_density, rhs_density, transpose_a, transpose_b, forward_stype):
+    def check_dot_determinism(lhs_stype, rhs_stype, lhs_density, rhs_density, transpose_a, transpose_b, forward_stype):
         lhs_row = rnd.randint(50, 100)
         lhs_col = rnd.randint(50, 100)
         if transpose_a:
@@ -1444,10 +1444,11 @@ def test_sparse_dot_determinism():
         res2 = mx.nd.sparse.dot(lhs, rhs, transpose_a=transpose_a, transpose_b=transpose_b, forward_stype=forward_stype)
         assert_almost_equal(res1.asnumpy(), res2.asnumpy(), rtol=0.0, atol=0.0)
 
-    test_dot_determinism('csr', 'default', 0.1, 1.0, True, False, 'row_sparse')
+    check_dot_determinism('csr', 'default', 0.1, 1.0, True, False, 'row_sparse')
     forward_stype = 'csr' if default_context() == mx.cpu() else 'default'
-    test_dot_determinism('default', 'csr', 1.0, 0.1, False, False, forward_stype)
-    test_dot_determinism('default', 'csr', 1.0, 0.1, False, True, forward_stype)
+    check_dot_determinism('default', 'csr', 1.0, 0.1, False, False, forward_stype)
+    check_dot_determinism('default', 'csr', 1.0, 0.1, False, True, forward_stype)
+    check_dot_determinism('csr', 'default', 0.1, 1.0, True, False, 'default')
 
 
 @with_seed()
@@ -2121,16 +2122,16 @@ def test_batchnorm_fallback():
         mean_std = [mx.nd.array(rolling_mean).tostype(stype), mx.nd.array(rolling_std).tostype(stype)]
 
         test = mx.symbol.BatchNorm(data, fix_gamma=True)
-        assertRaises(MXNetError, check_numeric_gradient, test, in_location, mean_std, numeric_eps=1e-2, rtol=0.16, atol=1e-2)
+        assertRaises(MXNetError, check_numeric_gradient, test, in_location, mean_std, numeric_eps=1e-3, rtol=0.16, atol=1e-2)
 
         test = mx.symbol.BatchNorm(data, fix_gamma=True, use_global_stats=True)
-        assertRaises(MXNetError, check_numeric_gradient, test, in_location, mean_std, numeric_eps=1e-2, rtol=0.16, atol=1e-2)
+        assertRaises(MXNetError, check_numeric_gradient, test, in_location, mean_std, numeric_eps=1e-3, rtol=0.16, atol=1e-2)
 
         test = mx.symbol.BatchNorm(data, fix_gamma=False)
-        check_numeric_gradient(test, in_location, mean_std, numeric_eps=1e-2, rtol=0.16, atol=1e-2)
+        check_numeric_gradient(test, in_location, mean_std, numeric_eps=1e-3, rtol=0.16, atol=1e-2)
 
         test = mx.symbol.BatchNorm(data, fix_gamma=False, use_global_stats=True)
-        check_numeric_gradient(test, in_location, mean_std, numeric_eps=1e-2, rtol=0.16, atol=1e-2)
+        check_numeric_gradient(test, in_location, mean_std, numeric_eps=1e-3, rtol=0.16, atol=1e-2)
 
         # Test varying channel axis
         dim = len(shape)
@@ -2159,16 +2160,16 @@ def test_batchnorm_fallback():
                             mx.nd.array(xrolling_std).tostype(stype)]
 
             test = mx.symbol.BatchNorm(data, fix_gamma=True, axis=chaxis)
-            assertRaises(MXNetError, check_numeric_gradient, test, in_location, xmean_std, numeric_eps=1e-2, rtol=0.2, atol=0.01)
+            assertRaises(MXNetError, check_numeric_gradient, test, in_location, xmean_std, numeric_eps=1e-3, rtol=0.2, atol=0.01)
 
             test = mx.symbol.BatchNorm(data, fix_gamma=True, use_global_stats=True, axis=chaxis)
-            assertRaises(MXNetError, check_numeric_gradient, test, in_location, xmean_std, numeric_eps=1e-2, rtol=0.2, atol=0.01)
+            assertRaises(MXNetError, check_numeric_gradient, test, in_location, xmean_std, numeric_eps=1e-3, rtol=0.2, atol=0.01)
 
             test = mx.symbol.BatchNorm(data, fix_gamma=False, axis=chaxis)
-            check_numeric_gradient(test, in_location, xmean_std, numeric_eps=1e-2, rtol=0.2, atol=0.01)
+            check_numeric_gradient(test, in_location, xmean_std, numeric_eps=1e-3, rtol=0.2, atol=0.01)
 
             test = mx.symbol.BatchNorm(data, fix_gamma=False, use_global_stats=True, axis=chaxis)
-            check_numeric_gradient(test, in_location, xmean_std, numeric_eps=1e-2, rtol=0.2, atol=0.01)
+            check_numeric_gradient(test, in_location, xmean_std, numeric_eps=1e-3, rtol=0.2, atol=0.01)
 
 
 @with_seed()

@@ -23,7 +23,7 @@ import sys
 import os
 from collections import namedtuple
 
-from mxnet.base import xrange
+from six.moves import xrange
 
 current_working_directory = os.getcwd()
 sys.path.append(current_working_directory + "/..")
