@@ -101,6 +101,8 @@ def get_platforms(path: str = get_dockerfiles_path()) -> List[str]:
 
 def get_docker_tag(platform: str, registry: str) -> str:
     """:return: docker tag to be used for the container"""
+    if not registry:
+        registry = "mxnet_local"
     return "{0}/build.{1}".format(registry, platform)
 
 
@@ -112,14 +114,14 @@ def get_docker_binary(use_nvidia_docker: bool) -> str:
     return "nvidia-docker" if use_nvidia_docker else "docker"
 
 
-def build_docker(platform: str, docker_binary: str, registry: str, num_retries: int, use_cache: bool) -> str:
+def build_docker(platform: str, docker_binary: str, registry: str, num_retries: int, no_cache: bool) -> str:
     """
     Build a container for the given platform
     :param platform: Platform
     :param docker_binary: docker binary to use (docker/nvidia-docker)
     :param registry: Dockerhub registry name
     :param num_retries: Number of retries to build the docker image
-    :param use_cache: will pass cache_from to docker to use the previously pulled tag
+    :param no_cache: pass no-cache to docker to rebuild the images
     :return: Id of the top level image
     """
     tag = get_docker_tag(platform=platform, registry=registry)
@@ -144,7 +146,9 @@ def build_docker(platform: str, docker_binary: str, registry: str, num_retries: 
            "-f", get_dockerfile(platform),
            "--build-arg", "USER_ID={}".format(os.getuid()),
            "--build-arg", "GROUP_ID={}".format(os.getgid())]
-    if use_cache:
+    if no_cache:
+        cmd.append("--no-cache")
+    elif registry:
         cmd.extend(["--cache-from", tag])
     cmd.extend(["-t", tag, get_dockerfiles_path()])
 
@@ -196,7 +200,7 @@ def default_ccache_dir() -> str:
         ccache_dir = "/tmp/_mxnet_ccache"
         os.makedirs(ccache_dir, exist_ok=True)
         return ccache_dir
-    return os.path.join(tempfile.gettempdir(), "ci_ccache")
+    return os.path.join(os.path.expanduser("~"), ".ccache")
 
 
 def trim_container_id(cid):
@@ -322,6 +326,10 @@ def container_run(platform: str,
                 wait_result = container.wait(timeout=container_wait_s)
                 logging.info("Container exit status: %s", wait_result)
                 ret = wait_result.get('StatusCode', 200)
+                if ret != 0:
+                    logging.error("Container exited with an error 😞")
+                else:
+                    logging.info("Container exited with success 👍")
             except Exception as e:
                 logging.exception(e)
                 ret = 150
@@ -380,11 +388,15 @@ def script_name() -> str:
     """:returns: script name with leading paths removed"""
     return os.path.split(sys.argv[0])[1]
 
-
-def main() -> int:
+def config_logging():
+    import time
     logging.getLogger().setLevel(logging.INFO)
     logging.getLogger("requests").setLevel(logging.WARNING)
-    logging.basicConfig(format='{}: %(asctime)-15s %(message)s'.format(script_name()))
+    logging.basicConfig(format='{}: %(asctime)sZ %(levelname)s %(message)s'.format(script_name()))
+    logging.Formatter.converter = time.gmtime
+
+def main() -> int:
+    config_logging()
 
     logging.info("MXNet container based build tool.")
     log_environment()
@@ -422,7 +434,7 @@ def main() -> int:
                         action='store_true')
 
     parser.add_argument("-d", "--docker-registry",
-                        help="Dockerhub registry name to retrieve cache from. Default is 'mxnetci'",
+                        help="Dockerhub registry name to retrieve cache from.",
                         default='mxnetci',
                         type=str)
 
@@ -431,10 +443,8 @@ def main() -> int:
                         default=1,
                         type=int)
 
-    parser.add_argument("-c", "--no-dockerhub-cache", action="store_true",
-                        help="Disables use of --cache-from option on docker build, allowing docker"
-                        " to use local layers for caching. If absent, we use the cache from dockerhub"
-                        " which is the default.")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="passes --no-cache to docker build")
 
     parser.add_argument("command",
                         help="command to run in the container",
@@ -446,9 +456,6 @@ def main() -> int:
                         type=str)
 
     args = parser.parse_args()
-
-    def use_cache():
-        return not args.no_dockerhub_cache or under_ci()
 
     command = list(chain(*args.command))
     docker_binary = get_docker_binary(args.nvidiadocker)
@@ -472,10 +479,10 @@ def main() -> int:
     elif args.platform:
         platform = args.platform
         tag = get_docker_tag(platform=platform, registry=args.docker_registry)
-        if use_cache():
+        if args.docker_registry:
             load_docker_cache(tag=tag, docker_registry=args.docker_registry)
         build_docker(platform=platform, docker_binary=docker_binary, registry=args.docker_registry,
-                     num_retries=args.docker_build_retries, use_cache=use_cache())
+                     num_retries=args.docker_build_retries, no_cache=args.no_cache)
         if args.build_only:
             logging.warning("Container was just built. Exiting due to build-only.")
             return 0
@@ -512,10 +519,9 @@ def main() -> int:
         logging.info("Artifacts will be produced in the build/ directory.")
         for platform in platforms:
             tag = get_docker_tag(platform=platform, registry=args.docker_registry)
-            if use_cache():
-                load_docker_cache(tag=tag, docker_registry=args.docker_registry)
+            load_docker_cache(tag=tag, docker_registry=args.docker_registry)
             build_docker(platform, docker_binary=docker_binary, registry=args.docker_registry,
-                         num_retries=args.docker_build_retries, use_cache=use_cache())
+                         num_retries=args.docker_build_retries, no_cache=args.no_cache)
             if args.build_only:
                 continue
             shutil.rmtree(buildir(), ignore_errors=True)
