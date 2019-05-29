@@ -29,10 +29,10 @@ namespace op {
 		CHECK_EQ(ishape.ndim(), 2)
 			<< "gather_point requires index tensor to have 2 dimensions";
 
-		TShape oshape(3);
-		oshape[0] = ishape[0];
-		oshape[1] = ishape[1];
-		oshape[2] = 3;
+		TShape oshape({ishape[0], ishape[1], 3});
+		//oshape[0] = ishape[0];
+		//oshape[1] = ishape[1];
+		//oshape[2] = 3;
 
 		SHAPE_ASSIGN_CHECK(*out_attrs, 0, oshape);
 		return true;

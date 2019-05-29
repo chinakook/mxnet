@@ -36,10 +36,10 @@ namespace op {
 
         const FarthestPointSamplingParam& param = nnvm::get<FarthestPointSamplingParam>(attrs.parsed);
 
-		TShape oshape(2);
-		oshape[0] = dshape[0];
-		oshape[1] = param.npoints;
-		//oshape[2] = 3;
+		TShape oshape({dshape[0], param.npoints });
+		//oshape[0] = dshape[0];
+		//oshape[1] = param.npoints;
+		// //oshape[2] = 3;
 
 		SHAPE_ASSIGN_CHECK(*out_attrs, 0, oshape);
 		return true;
