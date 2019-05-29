@@ -71,7 +71,7 @@ NNVM_REGISTER_OP(_contrib_GatherPoint)
 	[](const NodeAttrs& attrs) {
 	return std::vector<std::string>{"data", "idx"};
 })
-.set_attr<nnvm::FInferShape>("FInferShape", GatherPointShape)
+.set_attr<mxnet::FInferShape>("FInferShape", GatherPointShape)
 .set_attr<nnvm::FInferType>("FInferType", GatherPointType)
 .set_attr<FCompute>("FCompute<cpu>", GatherPointCompute<cpu>)
 .set_attr<nnvm::FGradient>("FGradient", 
