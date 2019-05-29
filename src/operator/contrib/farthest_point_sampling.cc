@@ -86,7 +86,7 @@ NNVM_REGISTER_OP(_contrib_FarthestPointSampling)
 	[](const NodeAttrs& attrs) {
 	return std::vector<std::string>{"data"};
 })
-.set_attr<nnvm::FInferShape>("FInferShape", FarthestPointSamplingShape)
+.set_attr<mxnet::FInferShape>("FInferShape", FarthestPointSamplingShape)
 .set_attr<nnvm::FInferType>("FInferType", FarthestPointSamplingType)
 .set_attr<FResourceRequest>("FResourceRequest",
   [](const NodeAttrs& attrs) {
