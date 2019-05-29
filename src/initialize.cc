@@ -26,6 +26,7 @@
 #include <dmlc/logging.h>
 #include <mxnet/engine.h>
 #include "./engine/openmp.h"
+#include "./operator/custom/custom-inl.h"
 #if MXNET_USE_OPENCV
 #include <opencv2/opencv.hpp>
 #endif  // MXNET_USE_OPENCV
@@ -44,27 +45,37 @@ class LibraryInitializer {
   LibraryInitializer() {
     dmlc::InitLogging("mxnet");
 #if MXNET_USE_SIGNAL_HANDLER && DMLC_LOG_STACK_TRACE
-    signal(SIGSEGV, SegfaultLogger);
+    struct sigaction sa;
+    sigaction(SIGSEGV, nullptr, &sa);
+    if (sa.sa_handler == nullptr) {
+        signal(SIGSEGV, SegfaultLogger);
+    }
 #endif
 
 // disable openmp for multithreaded workers
 #ifndef _WIN32
+    using op::custom::CustomOperator;
     pthread_atfork(
       []() {
+        CustomOperator::Get()->Stop();
         Engine::Get()->Stop();
       },
       []() {
         Engine::Get()->Start();
+        CustomOperator::Get()->Start();
       },
       []() {
-        // Make children single threaded since they are typically workers
-        dmlc::SetEnv("MXNET_CPU_WORKER_NTHREADS", 1);
+        // Conservative thread management for multiprocess workers
+        const size_t mp_worker_threads = dmlc::GetEnv("MXNET_MP_WORKER_NTHREADS", 1);
+        dmlc::SetEnv("MXNET_CPU_WORKER_NTHREADS", mp_worker_threads);
         dmlc::SetEnv("OMP_NUM_THREADS", 1);
 #if MXNET_USE_OPENCV && !__APPLE__
-        cv::setNumThreads(0);  // disable opencv threading
+        const size_t mp_cv_num_threads = dmlc::GetEnv("MXNET_MP_OPENCV_NUM_THREADS", 0);
+        cv::setNumThreads(mp_cv_num_threads);  // disable opencv threading
 #endif  // MXNET_USE_OPENCV
         engine::OpenMP::Get()->set_enabled(false);
         Engine::Get()->Start();
+        CustomOperator::Get()->Start();
       });
 #endif
   }

@@ -21,11 +21,12 @@
 #define MXNET_OPERATOR_SUBGRAPH_MKLDNN_MKLDNN_CONV_INL_H_
 #if MXNET_USE_MKLDNN == 1
 
+#include <string>
 #include <utility>
 #include <vector>
-#include <string>
-#include "../../nn/convolution-inl.h"
+#include "../../nn/activation-inl.h"
 #include "../../nn/batch_norm-inl.h"
+#include "../../nn/convolution-inl.h"
 #include "../../nn/mkldnn/mkldnn_convolution-inl.h"
 
 namespace mxnet {
@@ -36,8 +37,24 @@ struct MKLDNNConvFusionParam {
   std::shared_ptr<BatchNormParam> bn_param;
 };
 
-static const size_t uint8_range = 255;
-static const size_t int8_range = 127;
+static inline bool IsOutputUInt8(const MKLDNNConvFusionParam& param) {
+  bool result = false;
+  const auto& mkldnn_param = param.full_conv_param.mkldnn_param;
+  auto IsOutputUInt8Helper = [](const mkldnn::algorithm& act_alg) {
+    return (act_alg == mkldnn::algorithm::eltwise_relu ||
+            act_alg == mkldnn::algorithm::eltwise_logistic ||
+            act_alg == mkldnn::algorithm::eltwise_soft_relu ||
+            act_alg == mkldnn::algorithm::eltwise_bounded_relu);
+  };
+  if ((!mkldnn_param.with_sum) && mkldnn_param.with_act) {
+    CHECK(param.full_conv_param.act_param.alg != mkldnn::algorithm::algorithm_undef);
+    result = IsOutputUInt8Helper(param.full_conv_param.act_param.alg);
+  } else if (mkldnn_param.with_postsum_act) {
+    CHECK(param.full_conv_param.postsum_act_param.alg != mkldnn::algorithm::algorithm_undef);
+    result = IsOutputUInt8Helper(param.full_conv_param.postsum_act_param.alg);
+  }
+  return result;
+}
 
 enum MKLDNNConvOpOutputs { kOut, kMin, kMax };
 

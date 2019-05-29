@@ -37,7 +37,7 @@
 
 using namespace mxnet;
 
-inline static mkldnn::memory::primitive_desc GetMemPD(const TShape s, int dtype,
+inline static mkldnn::memory::primitive_desc GetMemPD(const mxnet::TShape s, int dtype,
                                                mkldnn::memory::format format) {
   mkldnn::memory::dims dims(s.ndim());
   for (size_t i = 0; i < dims.size(); i++)
@@ -49,7 +49,7 @@ inline static mkldnn::memory::primitive_desc GetMemPD(const TShape s, int dtype,
 inline static mkldnn::memory::primitive_desc GetExpandedMemPD(
     mkldnn::memory::primitive_desc pd, float scale, int dim = 0) {
   CHECK(dim < pd.desc().data.ndims) << "dimension cannot be larger than total dimensions of input";
-  nnvm::TShape s(pd.desc().data.ndims);
+  mxnet::TShape s(pd.desc().data.ndims, -1);
   for (size_t i = 0; i < pd.desc().data.ndims; i++)
     s[i] = pd.desc().data.dims[i];
   s[dim] = static_cast<int>(s[dim] * scale);
@@ -58,7 +58,7 @@ inline static mkldnn::memory::primitive_desc GetExpandedMemPD(
 }
 
 struct TestArrayShapes {
-  std::vector<nnvm::TShape> shapes;
+  std::vector<mxnet::TShape> shapes;
   std::vector<mkldnn::memory::primitive_desc> pds;
 };
 
@@ -85,7 +85,7 @@ inline static void InitMKLDNNArray(NDArray *arr, const mkldnn::memory::primitive
   arr->WaitToRead();
 }
 
-inline static bool IsSameShape(mkldnn::memory::primitive_desc pd, TShape shape) {
+inline static bool IsSameShape(mkldnn::memory::primitive_desc pd, mxnet::TShape shape) {
   if (pd.desc().data.ndims != shape.ndim()) return false;
   for (size_t i = 0; i < shape.ndim(); i++)
     if (pd.desc().data.dims[i] != shape[i]) return false;
@@ -159,13 +159,13 @@ inline static std::vector<mkldnn::memory::format> GetMKLDNNFormat(size_t num_dim
   }
 }
 
-inline static TestArrayShapes GetTestArrayShapes() {
+inline static TestArrayShapes GetTestArrayShapes(bool spatial_data_format = false) {
   int dtype = mshadow::DataType<mshadow::default_real_t>::kFlag;
-  std::vector<TShape> shapes;
+  mxnet::ShapeVector shapes;
   std::vector<mkldnn::memory::primitive_desc> pds;
   {
     // 1D
-    TShape s(1);
+    mxnet::TShape s(1, -1);
     s[0] = 279936;
     shapes.push_back(s);
     pds.push_back(GetMemPD(s, dtype, mkldnn::memory::format::x));
@@ -175,7 +175,7 @@ inline static TestArrayShapes GetTestArrayShapes() {
   }
   {
     // 2D
-    TShape s(2);
+    mxnet::TShape s(2, -1);
     s[0] = 96;
     s[1] = 2916;
     shapes.push_back(s);
@@ -187,28 +187,32 @@ inline static TestArrayShapes GetTestArrayShapes() {
   }
   {
     // 4D
-    TShape s1(4);
+    mxnet::TShape s1(4, -1);
     s1[0] = 10; s1[1] = 96; s1[2] = 54; s1[3] = 54;
     shapes.push_back(s1);
     pds.push_back(GetMemPD(s1, dtype, mkldnn::memory::format::nchw));
 
-    TShape s2(4);
+    mxnet::TShape s2(4, -1);
     s2[0] = 96; s2[1] = 3; s2[2] = 11; s2[3] = 11;
     shapes.push_back(s2);
     pds.push_back(GetMemPD(s2, dtype, mkldnn::memory::format::oihw));
 
     std::vector<mkldnn::memory::format> formats = GetMKLDNNFormat(4, dtype);
-    pds.push_back(GetMemPD(s1, dtype, formats[0]));
+    if (!spatial_data_format) {
+      pds.push_back(GetMemPD(s1, dtype, formats[0]));
+    }
   }
   {
     // 5D
-    TShape s(5);
+    mxnet::TShape s(5, -1);
     s[0] = 96; s[1] = 1; s[2] = 3; s[3] = 11; s[4] = 11;
     shapes.push_back(s);
     pds.push_back(GetMemPD(s, dtype, mkldnn::memory::format::goihw));
 
     std::vector<mkldnn::memory::format> formats = GetMKLDNNFormat(5, dtype);
-    pds.push_back(GetMemPD(s, dtype, formats[0]));
+    if (!spatial_data_format) {
+      pds.push_back(GetMemPD(s, dtype, formats[0]));
+    }
   }
 
   TestArrayShapes ret;
@@ -227,6 +231,7 @@ struct OpAttrs {
   nnvm::NodeAttrs attrs;
   std::vector<DispatchMode> dispatches;
   std::set<OpReqType> requests;
+  std::unordered_set<int> accept_dims;
   int num_inputs;
   int num_outputs;
   int input_types;
@@ -250,6 +255,38 @@ enum ArrayTypes {
   All = 8191,
 };
 
+
+inline NDArray CreateKernelNDArray(mxnet::TShape kernel, int num_filters, mxnet::TShape input,
+    bool is_deconv = false) {
+  CHECK_EQ(kernel.ndim(), 2) << "mkldnn only supports 2d filters on 4d inputs";
+  mxnet::TShape target_shape(4, -1);
+  target_shape[0] = is_deconv ? input[1] : num_filters;
+  target_shape[1] = is_deconv ? num_filters : input[1];
+  target_shape[2] = kernel[0];
+  target_shape[3] = kernel[1];
+  int dtype = mshadow::DataType<mshadow::default_real_t>::kFlag;
+  NDArray arr(target_shape, Context());
+  auto pd = GetMemPD(target_shape, dtype, mkldnn::memory::format::nchw);
+  InitMKLDNNArray(&arr, pd);
+  return arr;
+}
+
+inline NDArray CreateBiasNDArray(mxnet::TShape target_shape) {
+  int dtype = mshadow::DataType<mshadow::default_real_t>::kFlag;
+  NDArray arr(target_shape, Context());
+  auto pd = GetMemPD(target_shape, dtype, mkldnn::memory::format::x);
+  InitMKLDNNArray(&arr, pd);
+  return arr;
+}
+
+inline int CalculateWidthConvOutput(int width, int kernel, int padding, int stride) {
+  return (width - kernel + 2 * padding) / stride  + 1;
+}
+
+inline int CalculateWidthDeconvOutput(int width, int kernel, int padding, int stride) {
+  return stride * (width - 1) + kernel - 2 * padding;
+}
+
 inline std::string CreateShapeString(int value, int dim) {
   std::stringstream ss;
   ss << "(";
@@ -262,8 +299,8 @@ inline std::string CreateShapeString(int value, int dim) {
 }
 
 inline void PrintVerifyMsg(const NDArrayAttrs &arr1, const NDArrayAttrs &arr2) {
-  TShape t1 = arr1.arr.shape();
-  TShape t2 = arr2.arr.shape();
+  mxnet::TShape t1 = arr1.arr.shape();
+  mxnet::TShape t2 = arr2.arr.shape();
   std::stringstream ss;
   std::cout << "Verifying: " << arr1.desc.c_str() << " " <<
             t1 << " with " << arr2.desc.c_str() << " " << t2 << "\n";
@@ -293,21 +330,21 @@ inline void PrintVerifyMsg(const NDArrayAttrs &arr1, const NDArrayAttrs &arr2) {
  */
 inline std::vector<NDArrayAttrs> GetTestInputArrays(
     int types = ArrayTypes::All, bool rand = false,
-    int num_inputs = 1, int dim = 0) {
-  TestArrayShapes tas = GetTestArrayShapes();
-  std::vector<nnvm::TShape> shapes = tas.shapes;
+    std::vector<float> scale = {1}, bool spatial_data_format = false) {
+  TestArrayShapes tas = GetTestArrayShapes(spatial_data_format);
+  std::vector<mxnet::TShape> shapes = tas.shapes;
   std::vector<mkldnn::memory::primitive_desc> pds = tas.pds;
 
   std::vector<NDArrayAttrs> in_arrs;
   std::string desc;
 
-  int slice_amount = 1;
-  if (dim == 0)
-    slice_amount = num_inputs;
+  int slice_amount = scale[0];
   for (auto shape : shapes) {
-    if (dim >= shape.ndim())
+    if (scale.size() > shape.ndim())
       continue;
-    shape[dim] = shape[dim] * num_inputs;
+
+    for (size_t dim = 0; dim < scale.size(); ++dim)
+      shape[dim] = static_cast<int>(round(shape[dim] * scale[dim]));
 
     // Type 1.
     NDArray arr(shape, Context());
@@ -326,12 +363,12 @@ inline std::vector<NDArrayAttrs> GetTestInputArrays(
 
 
     for (auto pd : pds) {
-      if (num_inputs > 1) {
+      for (size_t dim = 0; dim < scale.size(); ++dim) {
         // preserve if matching layout else just expand on 0 dim
         if (shape.ndim() == pd.desc().data.ndims)
-          pd = GetExpandedMemPD(pd, num_inputs, dim);
+          pd = GetExpandedMemPD(pd, scale[dim], dim);
         else
-          pd = GetExpandedMemPD(pd, num_inputs);
+          pd = GetExpandedMemPD(pd, scale[dim]);
       }
 
       if (shape.Size() != pd.get_size() / sizeof(mshadow::default_real_t))
@@ -406,10 +443,10 @@ inline std::vector<NDArrayAttrs> GetTestInputArrays(
  * Optional num_inputs / dim args can be passed to modify input shape (used for Concat test)
  */
 inline std::vector<NDArrayAttrs> GetTestOutputArrays(
-    const TShape &shp,
+    const mxnet::TShape &shp,
     const std::vector<mkldnn::memory::primitive_desc> &pds,
     std::vector<float>scale = {1}, bool rand = true, int types = ArrayTypes::All) {
-  TShape shape = shp;
+  mxnet::TShape shape = shp;
 
   for (int dim = 0; dim < scale.size(); dim++)
     shape[dim] = static_cast<int>(shape[dim] * scale[dim]);
@@ -424,7 +461,7 @@ inline std::vector<NDArrayAttrs> GetTestOutputArrays(
     InitDefaultArray(&in_arrs.back().arr, rand);
   }
 
-  TShape tmp_shape = shape;
+  mxnet::TShape tmp_shape = shape;
   if (types & ArrayTypes::NormalReshaped) {
     // Type 4.
     tmp_shape[0] = shape[0] * 2;
@@ -433,7 +470,7 @@ inline std::vector<NDArrayAttrs> GetTestOutputArrays(
     in_arrs.emplace_back(arr0.Slice(1, shape[0] + 1), "Reshaped NDArray");
   }
 
-  nnvm::TShape s(1);
+  mxnet::TShape s(1, -1);
   if (types & ArrayTypes::NormalReused) {
     // Type 5.
     // Get a reused version.
@@ -491,7 +528,7 @@ inline std::vector<NDArrayAttrs> GetTestOutputArrays(
 
     // Type 8, 9.
     // Get a reused version.
-    nnvm::TShape s(1);
+    mxnet::TShape s(1, -1);
     s[0] = shape.Size();
     NDArray arr = NDArray(s, Context());
     arr = arr.AsArray(shape, arr.dtype());
@@ -516,7 +553,7 @@ inline std::vector<NDArrayAttrs> GetTestOutputArrays(
  * Determines axis ndarrays are concatenated by
  * Used to verify concat/concat backwards operator
  */
-inline int GetDim(TShape input_shape, TShape output_shape) {
+inline int GetDim(mxnet::TShape input_shape, mxnet::TShape output_shape) {
   CHECK(input_shape.Size() != output_shape.Size());
   for (size_t i = 0; i < input_shape.ndim(); i++) {
     if (input_shape[i] != output_shape[i])
@@ -529,7 +566,7 @@ inline int GetDim(TShape input_shape, TShape output_shape) {
  * Calculates the size of continuous block of array inside larger concatenated array
  * Used to verify concat/concat backwards operator
  */
-inline int GetBlockSize(TShape shape, int dim) {
+inline int GetBlockSize(mxnet::TShape shape, int dim) {
   int block_size = 1;
   for (int i = shape.ndim() - 1; i >= dim; i--)
     block_size *= shape[i];

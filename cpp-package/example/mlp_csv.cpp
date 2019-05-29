@@ -72,7 +72,7 @@ std::vector<int> getLayers(const std::string& hidden_units_string) {
 void printUsage() {
     std::cout << "Usage:" << std::endl;
     std::cout << "mlp_csv --train mnist_training_set.csv --test mnist_test_set.csv --epochs 10 "
-    << "--batch_size 100 --hidden_units \"128 64 64\" [--gpu]" << std::endl;
+    << "--batch_size 100 --hidden_units \"128 64 64\" --gpu" << std::endl;
     std::cout << "The example uses mnist data in CSV format. The MNIST data in CSV format assumes "
     << "the column 0 to be label and the rest 784 column to be data." << std::endl;
     std::cout << "By default, the example uses 'cpu' context. If '--gpu' is specified, "
@@ -156,6 +156,7 @@ int main(int argc, char** argv) {
     .SetParam("shuffle", 0)
     .CreateDataIter();
 
+    TRY
     auto net = mlp(hidden_units);
 
     Context ctx = Context::cpu();
@@ -267,6 +268,8 @@ int main(int argc, char** argv) {
     }
 
     delete exec;
+    delete opt;
     MXNotifyShutdown();
+    CATCH
     return 0;
 }

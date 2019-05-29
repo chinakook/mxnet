@@ -58,12 +58,10 @@ class StorageFallbackOpExecutor : public OpExecutor {
     if (!init_) {
       pre_temp_buf_.clear();
       post_temp_buf_.clear();
-      for (size_t i = 0; i < in_array.size(); i++) {
-        auto &nd = in_array[i];
+      for (const auto& nd : in_array) {
         pre_temp_buf_.emplace_back(nd.shape(), nd.ctx(), true, nd.dtype());
       }
-      for (size_t i = 0; i < out_array.size(); i++) {
-        auto &nd = out_array[i];
+      for (const auto& nd : out_array) {
         post_temp_buf_.emplace_back(nd.shape(), nd.ctx(), true, nd.dtype());
       }
       init_ = true;
@@ -263,9 +261,9 @@ class FComputeExExecutor : public OpExecutor {
   ExecType exec_type_;
 };
 
-void CreateOpExecs(const Graph& g, OpExecVector* p_ret, size_t i) {
+void CreateOpExecs(const Graph& g, OpExecVector* p_ret, OpStateVector* p_state, size_t i) {
   using nnvm::DTypeVector;
-  using nnvm::ShapeVector;
+  using mxnet::ShapeVector;
   using nnvm::FMutateInputs;
 
   static auto& fcreate_op_state = nnvm::Op::GetAttr<FCreateOpState>("FCreateOpState");
@@ -274,7 +272,7 @@ void CreateOpExecs(const Graph& g, OpExecVector* p_ret, size_t i) {
   static auto& is_layer_backward = nnvm::Op::GetAttr<bool>("TIsLayerOpBackward");
 
   const auto& vdtype = g.GetAttr<DTypeVector>("dtype");
-  const auto& vshape = g.GetAttr<ShapeVector>("shape");
+  const auto& vshape = g.GetAttr<mxnet::ShapeVector>("shape");
   const auto& vctx = g.GetAttr<ContextVector>("context");
   const auto& dispatch_modes = g.GetAttr<DispatchModeVector>("dispatch_mode");
   // get the graph
@@ -295,7 +293,7 @@ void CreateOpExecs(const Graph& g, OpExecVector* p_ret, size_t i) {
   }
   CHECK(dispatch_modes[i] != DispatchMode::kUndefined);
   if (fcreate_op_state.count(op)) {
-    std::vector<TShape> ishape;
+    mxnet::ShapeVector ishape;
     std::vector<int> itype;
     for (const auto& e : inode.inputs) {
       ishape.emplace_back(vshape[idx.entry_id(e)]);
@@ -304,6 +302,10 @@ void CreateOpExecs(const Graph& g, OpExecVector* p_ret, size_t i) {
 
     OpStatePtr state = fcreate_op_state[op](
         inode.source->attrs, vctx[i], ishape, itype);
+    if (p_state) {
+      CHECK_GT(p_state->size(), i);
+      p_state->at(i) = state;
+    }
     FStatefulComputeEx fcompute_ex = common::GetFCompute<FStatefulComputeEx>(
         op, "FStatefulComputeEx", vctx[i]);
     // FStatefulComputeEx is dispatched only when dispatch_mode is DispatchMode::kFComputeEx
@@ -361,7 +363,7 @@ Graph AttachOpExecs(Graph g) {
   const auto& idx = g.indexed_graph();
   OpExecVector ret(idx.num_nodes());
   for (size_t i = 0; i < idx.num_nodes(); ++i) {
-    CreateOpExecs(g, &ret, i);
+    CreateOpExecs(g, &ret, nullptr, i);
   }
   g.attrs["op_execs"] = std::make_shared<nnvm::any>(ret);
   return g;

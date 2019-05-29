@@ -205,17 +205,17 @@ NNVM_REGISTER_OP(_contrib_AdaptiveAvgPooling2D)
 Applies a 2D adaptive average pooling over a 4D input with the shape of (NCHW).
 The pooling kernel and stride sizes are automatically chosen for desired output sizes.
 
-- If a single integer is provided for output_size, the output size is
-(N x C x output_size x output_size) for any input (NCHW).
+- If a single integer is provided for output_size, the output size is \
+  (N x C x output_size x output_size) for any input (NCHW).
 
-- If a tuple of integers (height, width) are provided for output_size, the output size is
-(N x C x height x width) for any input (NCHW).
+- If a tuple of integers (height, width) are provided for output_size, the output size is \
+  (N x C x height x width) for any input (NCHW).
 
 )code" ADD_FILELINE)
 .set_attr_parser(ParamParser<AdaptiveAvgPoolParam>)
 .set_num_inputs(1)
 .set_num_outputs(1)
-.set_attr<nnvm::FInferShape>("FInferShape", AdaptiveAvgPoolOpInferShape)
+.set_attr<mxnet::FInferShape>("FInferShape", AdaptiveAvgPoolOpInferShape)
 .set_attr<FCompute>("FCompute<cpu>", AdaptiveAvgPoolOpForward<cpu>)
 .set_attr<nnvm::FGradient>("FGradient",
   ElemwiseGradUseNone{"_backward_contrib_AdaptiveAvgPooling2D"})

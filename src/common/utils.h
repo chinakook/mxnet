@@ -118,10 +118,10 @@ void CheckFormatCSRImpl(const RunContext &rctx, const NDArray &input,
   using namespace op::mxnet_op;
   CHECK_EQ(input.storage_type(), kCSRStorage)
           << "CheckFormatCSRImpl is for CSRNDArray";
-  const TShape shape = input.shape();
-  const TShape idx_shape = input.aux_shape(csr::kIdx);
-  const TShape indptr_shape = input.aux_shape(csr::kIndPtr);
-  const TShape storage_shape = input.storage_shape();
+  const mxnet::TShape shape = input.shape();
+  const mxnet::TShape idx_shape = input.aux_shape(csr::kIdx);
+  const mxnet::TShape indptr_shape = input.aux_shape(csr::kIndPtr);
+  const mxnet::TShape storage_shape = input.storage_shape();
   if ((shape.ndim() != 2) ||
       (idx_shape.ndim() != 1 || indptr_shape.ndim() != 1 || storage_shape.ndim() != 1) ||
       (indptr_shape[0] != shape[0] + 1) ||
@@ -172,7 +172,7 @@ void CheckFormatRSPImpl(const RunContext &rctx, const NDArray &input,
   using namespace op::mxnet_op;
   CHECK_EQ(input.storage_type(), kRowSparseStorage)
           << "CheckFormatRSPImpl is for RSPNDArray";
-  const TShape idx_shape = input.aux_shape(rowsparse::kIdx);
+  const mxnet::TShape idx_shape = input.aux_shape(rowsparse::kIdx);
   if (idx_shape[0] != input.storage_shape()[0]) {
     MSHADOW_TYPE_SWITCH(err_cpu.type_flag_, DType, {
       DType* err = err_cpu.dptr<DType>();
@@ -474,6 +474,10 @@ inline void LogStorageFallback(const nnvm::NodeAttrs& attrs,
 #if MXNET_USE_MKLDNN == 1
   if (!MKLDNNEnvSet()) common::LogOnce("MXNET_MKLDNN_ENABLED flag is off. "
                                        "You can re-enable by setting MXNET_MKLDNN_ENABLED=1");
+  if (GetMKLDNNCacheSize() != -1) common::LogOnce("MXNET_MKLDNN_CACHE_NUM is set."
+                                       "Should only be set if "
+                                       "your model has variable input shapes, "
+                                       "as cache size may grow unbounded");
 #endif
 }
 
@@ -650,7 +654,7 @@ FCompType GetFCompute(const nnvm::Op* op, const std::string& name,
   } else if (ctx.dev_mask() == gpu::kDevMask) {
     return fcompute_gpu.get(op, nullptr);
   } else {
-    LOG(FATAL) << "Unknown device mask";
+    LOG(FATAL) << "Unknown device mask " << ctx.dev_mask();
     return nullptr;
   }
 }
@@ -685,7 +689,7 @@ MSHADOW_XINLINE int ilog2ui(unsigned int a) {
 /*!
  * \brief Return an NDArray of all zeros.
  */
-inline NDArray InitZeros(const NDArrayStorageType stype, const TShape &shape,
+inline NDArray InitZeros(const NDArrayStorageType stype, const mxnet::TShape &shape,
                          const Context &ctx, const int dtype) {
   // NDArray with default storage
   if (stype == kDefaultStorage) {
@@ -700,7 +704,7 @@ inline NDArray InitZeros(const NDArrayStorageType stype, const TShape &shape,
 /*!
  * \brief Helper to add a NDArray of zeros to a std::vector.
  */
-inline void EmplaceBackZeros(const NDArrayStorageType stype, const TShape &shape,
+inline void EmplaceBackZeros(const NDArrayStorageType stype, const mxnet::TShape &shape,
                              const Context &ctx, const int dtype,
                              std::vector<NDArray> *vec) {
   // NDArray with default storage
@@ -710,6 +714,81 @@ inline void EmplaceBackZeros(const NDArrayStorageType stype, const TShape &shape
   } else {
     // NDArray with non-default storage. Storage allocation is always delayed.
     vec->emplace_back(stype, shape, ctx, true, dtype);
+  }
+}
+
+
+/*!
+ * \brief parallelize copy by OpenMP.
+ */
+template<typename DType>
+inline void ParallelCopy(DType* dst, const DType* src, index_t size) {
+  static index_t copy_block_size = dmlc::GetEnv("MXNET_CPU_PARALLEL_COPY_SIZE", 200000);
+  if (size >= copy_block_size) {
+    #pragma omp parallel for num_threads(engine::OpenMP::Get()->GetRecommendedOMPThreadCount())
+    for (index_t i = 0; i < size; ++i) {
+      dst[i] = src[i];
+    }
+  } else {
+    std::memcpy(dst, src, sizeof(DType) * size);
+  }
+}
+
+/*!
+ * \brief If numpy compatibility is turned off (default), the shapes passed in
+ * by users follow the legacy shape definition:
+ * 1. 0 ndim means the shape is completely unknown.
+ * 2. 0 dim size means the dim size is unknown.
+ * We need to convert those shapes to use the numpy shape definition:
+ * 1. 0 ndim means it's a scalar tensor.
+ * 2. -1 ndim means the shape is unknown.
+ * 3. 0 dim size means no elements in that dimension.
+ * 4. -1 dim size means the dimension's size is unknown.
+ * so that operator's infer shape function can work in backend.
+ * \param shape to be converted.
+ * Note: It is possible that the shape to be converted is already
+ * numpy compatible. For example, when a subgraph operator's infer
+ * shape function is called from the infer shape pass of the whole
+ * graph, its input/output shapes have been converted to numpy
+ * compatible shapes.
+ */
+inline void ConvertToNumpyShape(mxnet::TShape* shape) {
+  if (shape->ndim() == 0) {  // legacy shape ndim = 0 means unknown
+    *shape = mxnet::TShape();  // unknown shape ndim = -1
+  } else {
+    for (int j = 0; j < shape->ndim(); ++j) {
+      if ((*shape)[j] == 0) {  // legacy shape dim_size = 0 means unknown
+        (*shape)[j] = -1;  // unknown dim size = -1
+      }
+    }
+  }
+}
+
+inline void ConvertToNumpyShape(mxnet::ShapeVector* shapes) {
+  for (size_t i = 0; i < shapes->size(); ++i) {
+    ConvertToNumpyShape(&(shapes->at(i)));
+  }
+}
+
+/*!
+ * \brief This is function is used to convert shapes returned by
+ * the infer shape functions/pass to the legacy shape definition.
+ */
+inline void ConvertToLegacyShape(mxnet::TShape* shape) {
+  if (!mxnet::ndim_is_known(*shape)) {
+    *shape = mxnet::TShape(0, -1);
+  } else {
+    for (int j = 0; j < shape->ndim(); ++j) {
+      if (!mxnet::dim_size_is_known(*shape, j)) {
+        (*shape)[j] = 0;
+      }
+    }
+  }
+}
+
+inline void ConvertToLegacyShape(mxnet::ShapeVector* shapes) {
+  for (size_t i = 0; i < shapes->size(); ++i) {
+    ConvertToLegacyShape(&(shapes->at(i)));
   }
 }
 
