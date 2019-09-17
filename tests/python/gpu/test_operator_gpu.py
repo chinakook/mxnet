@@ -35,6 +35,8 @@ sys.path.insert(0, os.path.join(curr_path, '../unittest'))
 from common import setup_module, with_seed, teardown, assert_raises_cudnn_not_satisfied
 from common import run_in_spawned_process
 from test_operator import *
+from test_numpy_ndarray import *
+from test_numpy_op import *
 from test_optimizer import *
 from test_random import *
 from test_exc_handling import *
@@ -44,6 +46,8 @@ from test_sparse_operator import *
 from test_ndarray import *
 from test_subgraph_op import *
 from test_contrib_operator import test_multibox_target_op
+from test_tvm_op import *
+from test_library_loading import *
 
 set_default_context(mx.gpu(0))
 del test_support_vector_machine_l1_svm  # noqa
@@ -1127,6 +1131,36 @@ def test_pooling_full_2d():
     test_pooling_full_2d_type('max')
     test_pooling_full_2d_type('avg')
     test_pooling_full_2d_type('sum')
+
+
+@with_seed()
+def test_flatten_slice_after_conv():
+    ctx_list = []
+
+    data = mx.sym.Variable('conv_data')
+    conv = mx.symbol.Convolution(data=data, name='conv', num_filter=16, kernel=(3,3), stride=(1,1))
+    flatten = mx.symbol.flatten(data=conv)
+    slice_sym = mx.symbol.slice(data=flatten, begin=0, end=1)
+
+    ctx_list = [{'ctx': mx.gpu(0), 'conv_data': (2, 16, 16, 16), 'type_dict': {'conv_data': np.float32}},
+                {'ctx': mx.cpu(0), 'conv_data': (2, 16, 16, 16), 'type_dict': {'conv_data': np.float32}}]
+    check_consistency(slice_sym, ctx_list)
+
+
+@with_seed()
+def test_bilinear_resize_op():
+    ctx_list = [{'ctx': mx.cpu(0), 'data': (2, 2, 20, 20), 'type_dict': {'data': np.float32}},
+                {'ctx': mx.gpu(0), 'data': (2, 2, 20, 20), 'type_dict': {'data': np.float32}}]
+
+    data = mx.sym.Variable('data')
+    sym = mx.sym.contrib.BilinearResize2D(data, height=10, width=5)
+    check_consistency(sym, ctx_list)
+
+    sym = mx.sym.contrib.BilinearResize2D(data, None, scale_height=2, scale_width=0.5, mode='odd_scale')
+    check_consistency(sym, ctx_list)
+
+    sym = mx.sym.contrib.BilinearResize2D(data, None, scale_height=0.5, scale_width=2, mode='to_even_up')
+    check_consistency(sym, ctx_list)
 
 
 @with_seed()
@@ -2296,6 +2330,22 @@ def test_math():
         for dtype in dtypes:
             for op in ops:
                 run_math(op, shape, dtype, check_value=check_value)
+
+@with_seed()
+def test_arange_like_dtype():
+    dtypes = [np.float16, np.float32, np.float64]
+
+    for t in dtypes:
+        x = mx.sym.Variable('x', dtype=t)
+        y = mx.sym.reshape(x, shape=(0, 0, -1))
+        z = mx.sym.contrib.arange_like(y, axis=-1)
+    
+        mod = z.simple_bind(ctx=mx.gpu(0), x=(3, 4, 5, 6), grad_req='null')
+        mod.arg_arrays[0][:] = np.random.normal(size=mod.arg_arrays[0].shape).astype(t)
+        out = mod.forward(is_train=False)
+        for v in out:
+            assert v.dtype == t
+    
 
 if __name__ == '__main__':
     import nose

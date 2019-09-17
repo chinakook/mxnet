@@ -28,6 +28,7 @@ from mxnet.gluon.data import DataLoader
 import mxnet.ndarray as nd
 from mxnet import context
 from mxnet.gluon.data.dataset import Dataset
+from mxnet.gluon.data.dataset import ArrayDataset
 
 @with_seed()
 def test_array_dataset():
@@ -278,6 +279,69 @@ def test_dataloader_context():
                                     pin_device_id=custom_dev_id)
     for _, x in enumerate(loader3):
         assert x.context == context.cpu_pinned(custom_dev_id)
+
+def batchify(a):
+    return a
+
+def test_dataset_filter():
+    length = 100
+    a = mx.gluon.data.SimpleDataset([i for i in range(length)])
+    a_filtered = a.filter(lambda x: x % 10 == 0)
+    assert(len(a_filtered) == 10)
+    for idx, sample in enumerate(a_filtered):
+        assert sample % 10 == 0
+    a_xform_filtered = a.transform(lambda x: x + 1).filter(lambda x: x % 10 == 0)
+    assert(len(a_xform_filtered) == 10)
+    # the filtered data is already transformed
+    for idx, sample in enumerate(a_xform_filtered):
+        assert sample % 10 == 0
+
+def test_dataset_take():
+    length = 100
+    a = mx.gluon.data.SimpleDataset([i for i in range(length)])
+    a_take_full = a.take(1000)
+    assert len(a_take_full) == length
+    a_take_full = a.take(None)
+    assert len(a_take_full) == length
+    count = 10
+    a_take_10 = a.take(count)
+    assert len(a_take_10) == count
+    expected_total = sum([i for i in range(count)])
+    total = 0
+    for idx, sample in enumerate(a_take_10):
+        assert sample < count
+        total += sample
+    assert total == expected_total
+
+    a_xform_take_10 = a.transform(lambda x: x * 10).take(count)
+    assert len(a_xform_take_10) == count
+    expected_total = sum([i * 10 for i in range(count)])
+    total = 0
+    for idx, sample in enumerate(a_xform_take_10):
+        assert sample < count * 10
+        total += sample
+    assert total == expected_total
+
+def test_dataloader_scope():
+    """
+    Bug: Gluon DataLoader terminates the process pool early while
+    _MultiWorkerIter is operating on the pool.
+
+    Tests that DataLoader is not garbage collected while the iterator is
+    in use.
+    """
+    args = {'num_workers': 1, 'batch_size': 2}
+    dataset = nd.ones(5)
+    iterator = iter(DataLoader(
+            dataset,
+            batchify_fn=batchify,
+            **args
+        )
+    )
+
+    item = next(iterator)
+
+    assert item is not None
 
 
 if __name__ == '__main__':

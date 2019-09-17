@@ -26,13 +26,17 @@ import warnings
 import re
 from collections import OrderedDict
 
-from ..base import mx_real_t
+from ..base import mx_real_t, MXNetError
 from .. import symbol, ndarray, initializer
 from ..symbol import Symbol
 from ..ndarray import NDArray
 from .. import name as _name
 from .parameter import Parameter, ParameterDict, DeferredInitializationError
 from .utils import _indent, _brief_print_list, HookHandle
+from .utils import _check_same_symbol_type, _check_all_np_ndarrays
+from .. import numpy_extension as _mx_npx
+from .. import numpy as _mx_np
+from .. util import is_np_array, np_shape, np_array
 
 
 class _BlockScope(object):
@@ -331,7 +335,8 @@ class Block(object):
         """
         params = self._collect_params_with_prefix()
         arg_dict = {key : val._reduce() for key, val in params.items()}
-        ndarray.save(filename, arg_dict)
+        save_fn = _mx_npx.save if is_np_array() else ndarray.save
+        save_fn(filename, arg_dict)
 
     def save_params(self, filename):
         """[Deprecated] Please use save_parameters. Note that if you want load
@@ -354,7 +359,7 @@ class Block(object):
                               'save_parameters may resolve this error.'%e.message)
 
     def load_parameters(self, filename, ctx=None, allow_missing=False,
-                        ignore_extra=False):
+                        ignore_extra=False, cast_dtype=False, dtype_source='current'):
         """Load parameters from file previously saved by `save_parameters`.
 
         Parameters
@@ -368,13 +373,40 @@ class Block(object):
         ignore_extra : bool, default False
             Whether to silently ignore parameters from the file that are not
             present in this Block.
-
+        cast_dtype : bool, default False
+            Cast the data type of the NDArray loaded from the checkpoint to the dtype
+            provided by the Parameter if any.
+        dtype_source : str, default 'current'
+            must be in {'current', 'saved'}
+            Only valid if cast_dtype=True, specify the source of the dtype for casting
+            the parameters
         References
         ----------
         `Saving and Loading Gluon Models \
         <https://mxnet.incubator.apache.org/tutorials/gluon/save_load_params.html>`_
         """
-        loaded = ndarray.load(filename)
+        if is_np_array():
+            # failure may happen when loading parameters saved as NDArrays within
+            # NumPy semantics. Check the failure type and recover from it if it happens.
+            try:
+                loaded = _mx_npx.load(filename)
+            except MXNetError as e:
+                err_msg = str(e)
+                if 'is_np_shape' in err_msg:
+                    # Loading failure due to parameters saved without numpy semantics.
+                    # Temporarily disable numpy semantics and load parameters. After it's
+                    # done, resume the numpy semantics. This is fine because the cases
+                    # numpy ndarray covers is a superset of the legacy ndarray's.
+                    with np_array(False):
+                        with np_shape(False):
+                            loaded_nds = ndarray.load(filename)
+                    assert isinstance(loaded_nds, dict),\
+                        'expecting a dict type, got {}'.format(str(type(loaded_nds)))
+                    loaded = {k: loaded_nds[k].as_np_ndarray() for k in loaded_nds}
+                else:
+                    raise ValueError(err_msg)
+        else:
+            loaded = ndarray.load(filename)
         params = self._collect_params_with_prefix()
         if not loaded and not params:
             return
@@ -383,7 +415,8 @@ class Block(object):
             # legacy loading
             del loaded
             self.collect_params().load(
-                filename, ctx, allow_missing, ignore_extra, self.prefix)
+                filename, ctx, allow_missing, ignore_extra, self.prefix,
+                cast_dtype=cast_dtype, dtype_source=dtype_source)
             return
 
         if not allow_missing:
@@ -399,7 +432,7 @@ class Block(object):
                     "which contains parameters %s. Set ignore_extra=True to ignore. "%(
                         name, filename, _brief_print_list(self._params.keys())))
             if name in params:
-                params[name]._load_init(loaded[name], ctx)
+                params[name]._load_init(loaded[name], ctx, cast_dtype=cast_dtype, dtype_source=dtype_source)
 
     def load_params(self, filename, ctx=None, allow_missing=False,
                     ignore_extra=False):
@@ -541,7 +574,8 @@ class Block(object):
 
         for hook in self._forward_hooks.values():
             hook(self, args, out)
-
+        if _mx_npx.is_np_array():
+            _check_all_np_ndarrays(out)
         return out
 
     def forward(self, *args):
@@ -731,9 +765,13 @@ class HybridBlock(Block):
         if not self._cached_graph:
             args, self._in_format = _flatten(args, "input")
             if len(args) > 1:
-                inputs = [symbol.var('data%d'%i) for i in range(len(args))]
+                inputs = [symbol.var('data%d' % i).as_np_ndarray()
+                          if isinstance(args[i], _mx_np.ndarray)
+                          else symbol.var('data%d' % i) for i in range(len(args))]
             else:
-                inputs = [symbol.var('data')]
+                inputs = [symbol.var('data').as_np_ndarray()
+                          if isinstance(args[0], _mx_np.ndarray)
+                          else symbol.var('data')]
             grouped_inputs = _regroup(inputs, self._in_format)[0]
 
             params = {i: j.var() for i, j in self._reg_params.items()}
@@ -741,7 +779,7 @@ class HybridBlock(Block):
                 out = self.hybrid_forward(symbol, *grouped_inputs, **params)  # pylint: disable=no-value-for-parameter
             out, self._out_format = _flatten(out, "output")
 
-            self._cached_graph = inputs, symbol.Group(out)
+            self._cached_graph = inputs, symbol.Group(out, _check_same_symbol_type(out))
 
         return self._cached_graph
 
@@ -834,8 +872,9 @@ class HybridBlock(Block):
         self._flags = list(kwargs.items())
         self._clear_cached_op()
         if active and self._forward_hooks or self._forward_pre_hooks:
-            warnings.warn('"{}" is being hybridized while still having forward hook/pre-hook. '
-                          'If "{}" is a child of HybridBlock, the hooks will not take effect.')
+            warnings.warn('"{block}" is being hybridized while still having forward hook/pre-hook. '
+                          'If "{block}" is a child of HybridBlock, the hooks will not take effect.'
+                          .format(block=self))
         super(HybridBlock, self).hybridize(active, **kwargs)
 
     def cast(self, dtype):
@@ -896,7 +935,8 @@ class HybridBlock(Block):
             else:
                 assert name in aux_names
                 arg_dict['aux:%s'%name] = param._reduce()
-        ndarray.save('%s-%04d.params'%(path, epoch), arg_dict)
+        save_fn = _mx_npx.save if is_np_array() else ndarray.save
+        save_fn('%s-%04d.params'%(path, epoch), arg_dict)
 
     def forward(self, x, *args):
         """Defines the forward computation. Arguments can be either
@@ -1018,10 +1058,15 @@ class SymbolBlock(HybridBlock):
         sym = symbol.load(symbol_file)
         if isinstance(input_names, str):
             input_names = [input_names]
-        inputs = [symbol.var(i) for i in input_names]
+        if param_file is None:
+            # Get a valid type inference by using fp32
+            inputs = [symbol.var(i, dtype=mx_real_t) for i in input_names]
+        else:
+            # Do not specify type, rely on saved params type instead
+            inputs = [symbol.var(i) for i in input_names]
         ret = SymbolBlock(sym, inputs)
         if param_file is not None:
-            ret.collect_params().load(param_file, ctx=ctx)
+            ret.collect_params().load(param_file, ctx=ctx, cast_dtype=True, dtype_source='saved')
         return ret
 
     def __repr__(self):
@@ -1044,7 +1089,7 @@ class SymbolBlock(HybridBlock):
 
         syms, self._in_format = _flatten(inputs, "input")
         out, self._out_format = _flatten(outputs, "output")
-        out = symbol.Group(out)
+        out = symbol.Group(out, _check_same_symbol_type(out))
 
         input_names = set()
         for i in syms:
@@ -1153,7 +1198,11 @@ def _infer_param_types(in_params, out_params, arg_params, aux_params, default_dt
     # Try to infer types of other parameters.
     if can_infer_input_type:
         params = {k:v for k, v in zip(input_sym_names, input_sym_arg_types)}
-        arg_types, _, aux_types = out_params.infer_type(**params)
+        try:
+            arg_types, _, aux_types = out_params.infer_type(**params)
+        except MXNetError:
+            # Cannot infer type with current input
+            arg_types, aux_types = None, None
 
     if arg_types is None or len(arg_types) != len(arg_params):
         arg_types = []

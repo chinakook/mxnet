@@ -176,6 +176,7 @@ struct DeconvolutionParam;
 struct SoftmaxParam;
 struct SoftmaxOutputParam;
 struct TransposeParam;
+struct ReshapeParam;
 bool SupportMKLDNNAct(const ActivationParam& param);
 bool SupportMKLDNNAct(const ActivationParam& param, const NDArray &input);
 bool SupportQuantizedMKLDNNAct(const ActivationParam &param);
@@ -184,6 +185,7 @@ bool SupportMKLDNNDeconv(const DeconvolutionParam& params, const NDArray &input)
 bool SupportMKLDNNSoftmax(const SoftmaxParam& param, const NDArray &input, const NDArray &output);
 bool SupportMKLDNNSoftmaxOutput(const SoftmaxOutputParam &param);
 bool SupportMKLDNNTranspose(const TransposeParam& param, const NDArray &data);
+bool SupportMKLDNNReshape(const ReshapeParam &param, const NDArray &data);
 }  // namespace op
 
 static int GetTypeSize(int dtype) {
@@ -617,6 +619,13 @@ bool MKLDNNStorageType(const nnvm::NodeAttrs &attrs,
     if (debug) check.Run(fn, attrs, ctx, inputs, req, outputs);
 #define MKLDNN_OPCHECK_COPY_RESULT(outputs, indice) \
     if (debug) check.CopyResult(outputs, indice);
+
+struct MKLDNNPostEltwiseParam {
+  mkldnn::algorithm alg = mkldnn::algorithm::algorithm_undef;
+  float scale = 1.f;
+  float alpha = 0.f;
+  float beta = 1.f;
+};
 
 }  // namespace mxnet
 #endif
