@@ -38,6 +38,7 @@ from . import numpy_extension as npx
 from . import name
 # use mx.sym as short for symbol
 from . import symbol as sym
+from .symbol.numpy import _symbol as np_symbol
 from . import symbol
 from . import symbol_doc
 from . import io
@@ -87,6 +88,8 @@ from . import rnn
 
 from . import gluon
 
+from . import tvmop
+
 __version__ = base.__version__
 
 # Dist kvstore module which launches a separate process when role is set to "server".
@@ -96,3 +99,7 @@ __version__ = base.__version__
 # checks the __version__ attr of MXNet, which is not set on kvstore server due to the
 # fact that kvstore-server module is imported before the __version__ attr is set.
 from . import kvstore_server
+
+from . import numpy_op_signature
+from . import numpy_dispatch_protocol
+from . import numpy_op_fallback
