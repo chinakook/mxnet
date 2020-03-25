@@ -21,6 +21,7 @@ import ctypes
 
 from ..base import _LIB, check_call, py_str, c_str, string_types, mx_uint, NDArrayHandle
 from ..base import c_array, c_handle_array, c_str_array
+from ..base import ctypes2buffer
 from .ndarray import NDArray
 from .ndarray import array as _array
 from .ndarray import empty as _empty_ndarray
@@ -34,7 +35,7 @@ try:
 except ImportError:
     spsp = None
 
-__all__ = ['zeros', 'empty', 'array', 'load', 'load_frombuffer', 'save']
+__all__ = ['zeros', 'empty', 'array', 'load', 'load_frombuffer', 'save', 'save_tobuffer']
 
 
 def zeros(shape, ctx=None, dtype=None, stype=None, **kwargs):
@@ -278,3 +279,67 @@ def save(fname, data):
                                   mx_uint(len(handles)),
                                   handles,
                                   keys))
+
+def save_tobuffer(data):
+    """Saves a list of arrays or a dict of str->array to file.
+
+    Examples of filenames:
+
+    - ``/path/to/file``
+    - ``s3://my-bucket/path/to/file`` (if compiled with AWS S3 supports)
+    - ``hdfs://path/to/file`` (if compiled with HDFS supports)
+
+    Parameters
+    ----------
+    fname : str
+        The filename.
+    data : NDArray, RowSparseNDArray or CSRNDArray, \
+           or list of NDArray, RowSparseNDArray or CSRNDArray, \
+           or dict of str to NDArray, RowSparseNDArray or CSRNDArray
+        The data to save.
+
+    Examples
+    --------
+    >>> x = mx.nd.zeros((2,3))
+    >>> y = mx.nd.ones((1,4))
+    >>> mx.nd.save('my_list', [x,y])
+    >>> mx.nd.save('my_dict', {'x':x, 'y':y})
+    >>> mx.nd.load('my_list')
+    [<NDArray 2x3 @cpu(0)>, <NDArray 1x4 @cpu(0)>]
+    >>> mx.nd.load('my_dict')
+    {'y': <NDArray 1x4 @cpu(0)>, 'x': <NDArray 2x3 @cpu(0)>}
+    """
+    from ..numpy import ndarray as np_ndarray
+    if isinstance(data, NDArray):
+        data = [data]
+        handles = c_array(NDArrayHandle, [])
+    if isinstance(data, dict):
+        str_keys = data.keys()
+        nd_vals = data.values()
+        if any(not isinstance(k, string_types) for k in str_keys) or \
+           any(not isinstance(v, NDArray) for v in nd_vals):
+            raise TypeError('save only accept dict str->NDArray or list of NDArray')
+        if any(isinstance(v, np_ndarray) for v in nd_vals):
+            raise TypeError('cannot save mxnet.numpy.ndarray using mxnet.ndarray.save;'
+                            ' use mxnet.numpy.save instead.')
+        keys = c_str_array(str_keys)
+        handles = c_handle_array(nd_vals)
+    elif isinstance(data, list):
+        if any(not isinstance(v, NDArray) for v in data):
+            raise TypeError('save only accept dict str->NDArray or list of NDArray')
+        if any(isinstance(v, np_ndarray) for v in data):
+            raise TypeError('cannot save mxnet.numpy.ndarray using mxnet.ndarray.save;'
+                            ' use mxnet.numpy.save instead.')
+        keys = None
+        handles = c_handle_array(data)
+    else:
+        raise ValueError("data needs to either be a NDArray, dict of str, NDArray pairs "
+                         "or a list of NDarrays.")
+    length = ctypes.c_size_t()
+    cptr = ctypes.POINTER(ctypes.c_char)()
+    check_call(_LIB.MXNDArraySaveToBuffer(mx_uint(len(handles)),
+                                          handles,
+                                          keys,
+                                          ctypes.byref(length),
+                                          ctypes.byref(cptr)))  
+    return ctypes2buffer(cptr, length.value)
