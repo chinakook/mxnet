@@ -23,6 +23,7 @@ __all__ = ['Trainer']
 from .. import optimizer as opt
 from ..model import _create_kvstore, _create_sparse_kvstore
 from .parameter import ParameterDict, Parameter
+from ..kvstore import KVStore
 
 class Trainer(object):
     """Applies an `Optimizer` on a set of Parameters. Trainer should
@@ -59,9 +60,11 @@ class Trainer(object):
         Arguments would then be {'type':'2bit', 'threshold':0.5}
         See mxnet.KVStore.set_gradient_compression method for more details on gradient compression.
     update_on_kvstore : bool, default None
-        Whether to perform parameter updates on kvstore. If None, then trainer will choose the more
-        suitable option depending on the type of kvstore. If the `update_on_kvstore` argument is
-        provided, environment variable `MXNET_UPDATE_ON_KVSTORE` will be ignored.
+        Whether to perform parameter updates on kvstore. If None and optimizer.aggregate_num <= 1,
+        then trainer will choose the more suitable option depending on the type of kvstore.
+        If None and optimizer.aggregate_num > 1, `update_on_kvstore` is set to False.
+        If the `update_on_kvstore` argument is provided,
+        environment variable `MXNET_UPDATE_ON_KVSTORE` will be ignored.
 
     Properties
     ----------
@@ -71,8 +74,11 @@ class Trainer(object):
     """
     def __init__(self, params, optimizer, optimizer_params=None, kvstore='device',
                  compression_params=None, update_on_kvstore=None):
+        param_list = []
         if isinstance(params, (dict, ParameterDict)):
-            params = list(params.values())
+            for key in sorted(list(params.keys())):
+                param_list.append(params[key])
+            params = param_list
         if not isinstance(params, (list, tuple)):
             raise ValueError(
                 "First argument must be a list or dict of Parameters, " \
@@ -99,6 +105,12 @@ class Trainer(object):
         optimizer_params = optimizer_params if optimizer_params else {}
         self._init_optimizer(optimizer, optimizer_params)
         self._scale = self._optimizer.rescale_grad
+        if self._optimizer.aggregate_num > 1 and update_on_kvstore is not None:
+            if update_on_kvstore:
+                raise ValueError("Cannot set update_on_kvstore=True "
+                                 "when optimizer.aggregate_num > 1.")
+        if update_on_kvstore is None and self._optimizer.aggregate_num > 1:
+            update_on_kvstore = False
         self._kvstore_params = {'kvstore': kvstore, 'update_on_kvstore': update_on_kvstore}
         self._kv_initialized = False
         self._kvstore = None
@@ -150,9 +162,10 @@ class Trainer(object):
                 else:
                     param_arrays = param._check_and_get(param._data, list)
                     idx = self._param2idx[param.name]
-                    self._kvstore.init(idx, param_arrays[0])
-                    if param._stype == 'default':
-                        self._kvstore.pull(idx, param_arrays, priority=-idx)
+                    if param._stype != 'default':
+                        self._kvstore.init(idx, param_arrays[0])
+                    else:
+                        self._kvstore.broadcast(idx, param_arrays[0], param_arrays)
 
         self._params_to_init = params_to_init
 
@@ -215,6 +228,10 @@ class Trainer(object):
                     raise ValueError("Cannot set update_on_kvstore=False on dist kvstore "
                                      "when sparse gradients are present.")
                 update_on_kvstore = config['update_on_kvstore']
+            # raise err if a custom kvstore is used for sparse training
+            if kvstore is not None and not isinstance(kvstore, KVStore):
+                raise ValueError("Cannot use {} for multi-device training with sparse gradients"
+                                 .format(type(kvstore)))
 
         else:
             # Training with dense weight and dense gradients.
@@ -231,6 +248,12 @@ class Trainer(object):
                                      "when training in async mode.")
             if config['update_on_kvstore'] is not None:
                 update_on_kvstore = config['update_on_kvstore']
+            # raise err if update_on_kvstore is set to True with kvstores that do not support optimizers
+            if update_on_kvstore and not kvstore.is_capable('optimizer'):
+                if config['update_on_kvstore']:
+                    raise ValueError("Please set update_on_kvstore=False "
+                                     "when training with {}".format(type(kvstore)))
+                update_on_kvstore = False
 
         # set grad compression and optimizers
         if kvstore:
@@ -354,14 +377,30 @@ class Trainer(object):
         self._allreduce_grads()
 
     def _allreduce_grads(self):
-        if self._kvstore:
-            for i, param in enumerate(self._params):
-                if param.grad_req != 'null':
+        # nothing to reduce
+        if not self._kvstore:
+            return
+        for i, param in enumerate(self._params):
+            if param.grad_req != 'null':
 
-                    self._kvstore.push(i, param.list_grad(), priority=-i)
-                    if not self._update_on_kvstore:
-                        self._kvstore.pull(i, param.list_grad(), priority=-i,
+                grad_list = param.list_grad()
+                # sparse gradients, call push and pull separately
+                if grad_list[0].stype != 'default':
+                    self._kvstore.push(i, grad_list, priority=-i)
+                    if param._stype == 'default':
+                        if self._update_on_kvstore:
+                            pull_list = param.list_data()
+                        else:
+                            pull_list = param.list_grad()
+                        self._kvstore.pull(i, pull_list, priority=-i,
                                            ignore_sparse=self._distributed)
+                else:
+                    # allreduce dense gradients if not update_on_kvstore,
+                    # otherwise push dense gradients, pull dense weights
+                    if self._update_on_kvstore:
+                        self._kvstore.pushpull(i, grad_list, out=param.list_data(), priority=-i)
+                    else:
+                        self._kvstore.pushpull(i, grad_list, priority=-i)
 
     def update(self, batch_size, ignore_stale_grad=False):
         """Makes one step of parameter update.
@@ -416,10 +455,6 @@ class Trainer(object):
                             %(param.name, str(data.context)))
 
             if self._kvstore and self._update_on_kvstore:
-                if param._stype == 'default':
-                    # 'row_sparse' parameters are not pulled immediately - they're pulled
-                    # in `Block.forward`
-                    self._kvstore.pull(i, param.list_data(), priority=-i)
                 continue
 
             for upd, arr, grad in zip(updates, param.list_data(), param.list_grad()):
@@ -430,8 +465,8 @@ class Trainer(object):
         if not (self._kvstore and self._update_on_kvstore):
             for updater, upd in zip(self._updaters, updates):
                 if upd:
-                    i, w, g = zip(*upd)
-                    updater(i, w, g)
+                    i, g, w = zip(*upd)
+                    updater(i, g, w)
 
     def save_states(self, fname):
         """Saves trainer states (e.g. optimizer, momentum) to a file.

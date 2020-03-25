@@ -299,8 +299,60 @@ struct mixed_mul {
     return static_cast<double>(a) * b;
   }
 };
+
+struct mixed_power {
+  template<typename DType,
+           typename std::enable_if<std::is_integral<DType>::value, int>::type = 0>
+  MSHADOW_XINLINE static mshadow::half::half_t Map(DType a, mshadow::half::half_t b) {
+    return static_cast<mshadow::half::half_t>(math::pow(a, b));
+  }
+
+  template<typename DType,
+           typename std::enable_if<std::is_same<DType, mshadow::half::half_t>::value ||
+                                   std::is_integral<DType>::value, int>::type = 0>
+  MSHADOW_XINLINE static float Map(DType a, float b) {
+    return static_cast<float>(math::pow(a, b));
+  }
+
+  template<typename DType,
+           typename std::enable_if<std::is_same<DType, mshadow::half::half_t>::value ||
+                                   std::is_same<DType, float>::value ||
+                                   std::is_integral<DType>::value, int>::type = 0>
+  MSHADOW_XINLINE static double Map(DType a, double b) {
+    return static_cast<double>(math::pow(a, b));
+  }
+};
+
+struct mixed_rpower {
+  template<typename DType,
+           typename std::enable_if<std::is_integral<DType>::value, int>::type = 0>
+  MSHADOW_XINLINE static mshadow::half::half_t Map(DType a, mshadow::half::half_t b) {
+    return static_cast<mshadow::half::half_t>(math::pow(b, a));
+  }
+
+  template<typename DType,
+           typename std::enable_if<std::is_same<DType, mshadow::half::half_t>::value ||
+                                   std::is_integral<DType>::value, int>::type = 0>
+  MSHADOW_XINLINE static float Map(DType a, float b) {
+    return static_cast<float>(math::pow(b, a));
+  }
+
+  template<typename DType,
+           typename std::enable_if<std::is_same<DType, mshadow::half::half_t>::value ||
+                                   std::is_same<DType, float>::value ||
+                                   std::is_integral<DType>::value, int>::type = 0>
+  MSHADOW_XINLINE static double Map(DType a, double b) {
+    return static_cast<double>(math::pow(b, a));
+  }
+};
 #endif
 
+
+#pragma GCC diagnostic push
+#if __GNUC__ >= 7
+#pragma GCC diagnostic ignored "-Wint-in-bool-context"
+#pragma GCC diagnostic ignored "-Wbool-compare"
+#endif
 MXNET_BINARY_MATH_OP_NC_WITH_BOOL(mul, a * b);
 
 MXNET_BINARY_MATH_OP_NC_WITH_BOOL(div, a / b);
@@ -308,10 +360,23 @@ MXNET_BINARY_MATH_OP_NC_WITH_BOOL(div, a / b);
 MXNET_BINARY_MATH_OP_NC_WITH_BOOL(plus, a + b);
 
 MXNET_BINARY_MATH_OP_NC_WITH_BOOL(minus, a - b);
+#pragma GCC diagnostic pop
 
 MXNET_UNARY_MATH_OP(negation, -a);
 
 MXNET_UNARY_MATH_OP(reciprocal, 1.0f / math::id(a));
+
+struct bitwise_not : public mxnet_op::tunable {
+  template<typename DType,
+           typename std::enable_if<!std::is_same<DType, bool>::value, int>::type = 0>
+  MSHADOW_XINLINE static DType Map(DType a) {
+    return ~static_cast<int64_t>(a);
+  }
+
+  MSHADOW_XINLINE static bool Map(bool a) {
+    return !a;
+  }
+};
 
 MXNET_UNARY_MATH_OP(reciprocal_grad, -1.0f / math::sqr(a));
 
@@ -560,6 +625,8 @@ MXNET_BINARY_MATH_OP(logical_or, a || b ? DType(1) : DType(0));
 
 MXNET_BINARY_MATH_OP(logical_xor, (a || b) && !(a && b) ? DType(1) : DType(0));
 
+MXNET_BINARY_MATH_OP(bitwise_and, static_cast<int64_t>(a) & static_cast<int64_t>(b));
+
 MXNET_BINARY_MATH_OP(bitwise_xor, static_cast<int64_t>(a) ^ static_cast<int64_t>(b));
 
 MXNET_BINARY_MATH_OP(bitwise_or, static_cast<int64_t>(a) | static_cast<int64_t>(b));
@@ -622,6 +689,51 @@ struct fix : public mxnet_op::tunable {
     return DType((floor > 0 ? floor : -floor) < (ceil > 0 ? ceil : -ceil) ? floor : ceil);
   }
 };
+
+#pragma GCC diagnostic push
+#if __GNUC__ >= 7
+#pragma GCC diagnostic ignored "-Wbool-compare"
+#endif
+/*! \brief used to determine whether a number is Not A Number*/
+struct isnan : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static bool Map(DType a) {
+    return IsNan(a);
+  }
+};
+
+/*! \brief used to determine whether a number is infinite*/
+struct isinf : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static bool Map(DType a) {
+    return IsInf(a);
+  }
+};
+
+/*! \brief used to determine whether a number is finite*/
+struct isfinite : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static bool Map(DType a) {
+    return !IsNan(a) && !IsInf(a);
+  }
+};
+
+/*! \brief used to determine whether a number is positive infinity*/
+struct isposinf : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static bool Map(DType a) {
+    return IsInf(a) && a > 0;
+  }
+};
+
+/*! \brief used to determine whether a number is negative infinity*/
+struct isneginf : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static bool Map(DType a) {
+    return IsInf(a) && a < 0;
+  }
+};
+#pragma GCC diagnostic pop
 
 /*! \brief used for generate gradient of MAE loss*/
 MXNET_BINARY_MATH_OP_NC(minus_sign, a - b > DType(0) ? DType(1) : -DType(1));
@@ -691,6 +803,28 @@ struct mod : public mxnet_op::tunable {
       return DType(0);
     } else {
       return DType(::fmod(static_cast<double>(a), static_cast<double>(b)));
+    }
+  }
+};
+
+struct fmod : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static DType Map(DType a, DType b) {
+    if (b == DType(0)) {
+      return DType(0);
+    } else {
+        return DType(::fmod(static_cast<double>(a), static_cast<double>(b)));
+    }
+  }
+};
+
+struct rfmod : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static DType Map(DType a, DType b) {
+    if (a == DType(0)) {
+      return DType(0);
+    } else  {
+      return DType(::fmod(static_cast<double>(b), static_cast<double>(a)));
     }
   }
 };
@@ -1031,6 +1165,20 @@ struct maximum : public mxnet_op::tunable {
   }
 };
 
+/*! \brief used for computing binary operator fmax */
+struct fmax : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static DType Map(DType a, DType b) {
+    if (IsNan(b)) {
+      return a;
+    } else if (IsNan(a)) {
+      return b;
+    } else {
+      return (a > b ? a : b);
+    }
+  }
+};
+
 /*! \brief used for computing binary operator minimum */
 struct minimum : public mxnet_op::tunable {
   template<typename DType>
@@ -1040,6 +1188,28 @@ struct minimum : public mxnet_op::tunable {
     } else {
       return DType(a < b ? a : b);
     }
+  }
+};
+
+/*! \brief used for computing binary operator fmin */
+struct fmin : public mxnet_op::tunable {
+  template<typename DType>
+  MSHADOW_XINLINE static DType Map(DType a, DType b) {
+    if (IsNan(b)) {
+      return a;
+    } else if (IsNan(a)) {
+      return b;
+    } else {
+      return (a < b ? a : b);
+    }
+  }
+};
+
+/*! \brief boolean any/all kernel that determines whether elem is NonZero */
+struct NonZero {
+  template<typename DType>
+  MSHADOW_XINLINE static bool Map(DType a) {
+    return (a != DType(0));
   }
 };
 
@@ -1193,7 +1363,12 @@ struct nrm2 {
   /*! \brief finalize reduction result */
   template<typename DType>
   MSHADOW_XINLINE static void Finalize(volatile DType& sum_of_squares, volatile DType& scale) { // NOLINT(*)
+#pragma GCC diagnostic push
+#if __GNUC__ >= 7
+#pragma GCC diagnostic ignored "-Wint-in-bool-context"
+#endif
     sum_of_squares = scale * math::sqrt(sum_of_squares);
+#pragma GCC diagnostic pop
   }
   /*!
    *\brief calculate gradient of redres with respect to redsrc,
@@ -1287,6 +1462,11 @@ struct nanprod_grad : public mxnet_op::tunable {
   }
 };
 
+#pragma GCC diagnostic push
+#if __GNUC__ >= 7
+#pragma GCC diagnostic ignored "-Wint-in-bool-context"
+#pragma GCC diagnostic ignored "-Wbool-compare"
+#endif
 /*! \brief used for computing binary lowest common multiple */
 struct lcm : public mxnet_op::tunable {
   template<typename DType>
@@ -1328,6 +1508,7 @@ struct lcm : public mxnet_op::tunable {
     return DType(0.0f);
   }
 };
+#pragma GCC diagnostic pop
 
 }  // namespace mshadow_op
 }  // namespace op

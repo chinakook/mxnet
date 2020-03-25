@@ -18,7 +18,6 @@
 # coding: utf-8
 # pylint: disable=unnecessary-pass, too-many-lines
 """Neural network parameter."""
-from __future__ import absolute_import
 
 __all__ = ['DeferredInitializationError', 'Parameter', 'Constant',
            'ParameterDict', 'tensor_types']
@@ -29,7 +28,7 @@ import warnings
 import numpy as np
 
 from ..base import mx_real_t, MXNetError
-from .. import symbol, ndarray, initializer, context
+from .. import symbol, ndarray, initializer, context, _deferred_compute as dc
 from ..context import Context, cpu
 from .. import autograd
 from .utils import _indent, _brief_print_list, shape_is_known
@@ -289,11 +288,18 @@ class Parameter(object):
                 elif dtype_source == 'saved':
                     self.dtype = data.dtype
             else:
-                assert np.dtype(self.dtype).type == data.dtype, \
-                "Failed loading Parameter '%s' from saved params: " \
-                "dtype incompatible expected %s vs saved %s. " \
-                "Set cast_dtype=True to cast the dtype of saved params."%(
-                    self.name, str(self.dtype), str(data.dtype))
+                if data.dtype == np.dtype([('bfloat16', np.uint16)]):
+                    assert np.dtype(self.dtype) == data.dtype, \
+                    "Failed loading Parameter '%s' from saved params: " \
+                    "dtype incompatible expected %s vs saved %s. " \
+                    "Set cast_dtype=True to cast the dtype of saved params."%(
+                        self.name, str(self.dtype), str(data.dtype))
+                else:
+                    assert np.dtype(self.dtype).type == data.dtype, \
+                    "Failed loading Parameter '%s' from saved params: " \
+                    "dtype incompatible expected %s vs saved %s. " \
+                    "Set cast_dtype=True to cast the dtype of saved params."%(
+                        self.name, str(self.dtype), str(data.dtype))
         if self._stype != data.stype:
             data = data.tostype(self._stype)
         if isinstance(ctx, Context):
@@ -329,7 +335,7 @@ class Parameter(object):
             "in_channels, etc for `Block`s."%(
                 self.name, str(self.shape))
 
-        with autograd.pause():
+        with autograd.pause(), dc.context(False):
             if data is None:
                 kwargs = {'shape': self.shape, 'dtype': self.dtype, 'ctx': context.cpu()}
                 if is_np_array():
@@ -562,7 +568,9 @@ class Parameter(object):
             raise RuntimeError("Cannot return a copy of Parameter '%s' on ctx %s via data() " \
                                "because its storage type is %s. Please use row_sparse_data() " \
                                "instead." % (self.name, str(ctx), self._stype))
-        return self._check_and_get(self._data, ctx)
+        data = self._check_and_get(self._data, ctx)
+        dc.set_variable(data, self.var())
+        return data
 
     def list_data(self):
         """Returns copies of this parameter on all contexts, in the same order
@@ -972,7 +980,7 @@ class ParameterDict(object):
                     "this may be due to your Block shares parameters from other "
                     "Blocks or you forgot to use 'with name_scope()' when creating "
                     "child blocks. For more info on naming, please see "
-                    "https://mxnet.apache.org/api/python/docs/tutorials/packages/gluon/naming.html"%(
+                    "https://mxnet.io/api/python/docs/tutorials/packages/gluon/blocks/naming.html"%(
                         strip_prefix, param.name, strip_prefix))
             arg_dict[param.name[len(strip_prefix):]] = weight
         ndarray.save(filename, arg_dict)
@@ -1006,7 +1014,9 @@ class ParameterDict(object):
             for name in self.keys():
                 assert name.startswith(restore_prefix), \
                     "restore_prefix is '%s' but Parameters name '%s' does not start " \
-                    "with '%s'"%(restore_prefix, name, restore_prefix)
+                    "with '%s'. For more info on naming, please see " \
+                    "https://mxnet.io/api/python/docs/tutorials/packages/gluon/blocks/naming.html"%(
+                        restore_prefix, name, restore_prefix)
         ndarray_load = ndarray.load(filename)
         self.load_dict(ndarray_load, ctx, allow_missing,
                        ignore_extra, restore_prefix, filename, cast_dtype, dtype_source)
@@ -1043,14 +1053,18 @@ class ParameterDict(object):
             for name in self.keys():
                 assert name in arg_dict, \
                     "Parameter '%s' is missing in %s, which contains parameters: %s. " \
-                    "Please make sure source and target networks have the same prefix."%(
+                    "Please make sure source and target networks have the same prefix." \
+                    "For more info on naming, please see " \
+                    "https://mxnet.io/api/python/docs/tutorials/packages/gluon/blocks/naming.html"%(
                         name[lprefix:], error_str, _brief_print_list(arg_dict.keys()))
         for name in arg_dict:
             if name not in self._params:
                 assert ignore_extra, \
                     "Parameter '%s' loaded from %s is not present in ParameterDict, " \
                     "choices are: %s. Set ignore_extra to True to ignore. " \
-                    "Please make sure source and target networks have the same prefix."%(
+                    "Please make sure source and target networks have the same prefix." \
+                    "For more info on naming, please see " \
+                    "https://mxnet.io/api/python/docs/tutorials/packages/gluon/blocks/naming.html"%(
                         name[lprefix:], error_str, _brief_print_list(self._params.keys()))
                 continue
             self[name]._load_init(arg_dict[name], ctx, cast_dtype=cast_dtype,
