@@ -126,6 +126,8 @@ def test_lstmp():
     check_rnn_layer_forward(gluon.rnn.LSTM(10, 2, bidirectional=True, dropout=0.5, projection_size=5),
                             mx.nd.ones((8, 3, 20)),
                             [mx.nd.ones((4, 3, 5)), mx.nd.ones((4, 3, 10))], run_only=True, ctx=ctx)
+    lstm_layer.save_parameters('gpu_tmp.params')
+    lstm_layer.load_parameters('gpu_tmp.params')
 
 
 @with_seed()
@@ -334,14 +336,18 @@ def test_global_norm_clip_multi_device():
     for check_isfinite in [True, False]:
         x1 = mx.nd.ones((3, 3), ctx=mx.gpu(0))
         x2 = mx.nd.ones((4, 4), ctx=mx.cpu(0))
+        x3 = mx.nd.ones((7, 4), ctx=mx.gpu(0))
+        x4 = mx.nd.ones((7, 4), ctx=mx.cpu(0))
         norm = gluon.utils.clip_global_norm(
-            [x1, x2], 1.0, check_isfinite=check_isfinite)
+            [x1, x2, x3, x4], 1.0, check_isfinite=check_isfinite)
         if check_isfinite:
-            assert norm == 5.0
+            assert norm == 9.0
         else:
-            assert norm.asscalar() == 5.0
-        assert_almost_equal(x1, np.ones((3, 3)) / 5)
-        assert_almost_equal(x2, np.ones((4, 4)) / 5)
+            assert norm.asscalar() == 9.0
+        assert_almost_equal(x1, np.ones((3, 3)) / 9)
+        assert_almost_equal(x2, np.ones((4, 4)) / 9)
+        assert_almost_equal(x3, np.ones((7, 4)) / 9)
+        assert_almost_equal(x4, np.ones((7, 4)) / 9)
 
 
 def _check_batchnorm_result(input, num_devices=1, cuda=False):
@@ -594,6 +600,24 @@ def test_hybridblock_mix_ctx_raise():
     assert_raises(ValueError, lambda: foo_hybrid(mx.nd.ones((10,), ctx=mx.gpu()),
                                                  mx.nd.ones((10,), ctx=mx.cpu())))
 
+@with_seed()
+def test_symbol_block_symbolic_bn_fp16_cast():
+    with mx.gpu(0):
+        net = mx.gluon.nn.HybridSequential()
+        sym = mx.sym.var('data')
+        conv = mx.sym.Convolution(sym, kernel=(3, 3), num_filter=16)
+        bn = mx.sym.BatchNorm(conv, name='bn_test')
+        internals = bn.get_internals()
+        net.add(mx.gluon.nn.SymbolBlock([internals['bn_test_output']], [mx.sym.var('data')]))
+        net.add(mx.gluon.nn.Conv2D(10, kernel_size=1))
+        net.initialize()
+        x = mx.nd.zeros((1, 3, 32, 32), dtype='float32')
+        y = net(x)
+        assert np.dtype(y.dtype).name == 'float32'
+        net.cast('float16')
+        x = x.astype('float16')
+        y1 = net(x)
+        assert np.dtype(y1.dtype).name == 'float16'
 
 if __name__ == '__main__':
     import nose
