@@ -75,7 +75,7 @@ NNVM_REGISTER_OP(_contrib_GatherPoint)
 .set_attr<nnvm::FInferType>("FInferType", GatherPointType)
 .set_attr<FCompute>("FCompute<cpu>", GatherPointCompute<cpu>)
 .set_attr<nnvm::FGradient>("FGradient", 
-  [](const nnvm::NodePtr& n, const std::vector<nnvm::NodeEntry>& ograds) {
+  [](const nnvm::ObjectPtr& n, const std::vector<nnvm::NodeEntry>& ograds) {
     auto p = nnvm::Node::Create();
     p->attrs.op = nnvm::Op::Get("_backward_GatherPoint");
     p->attrs.name = n->attrs.name + "_backward";
