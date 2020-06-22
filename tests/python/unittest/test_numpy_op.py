@@ -4216,6 +4216,7 @@ def test_np_swapaxes():
 
 @with_seed()
 @use_np
+@pytest.mark.skip(reason='https://github.com/apache/incubator-mxnet/issues/18600')
 def test_np_delete():
     class TestDelete(HybridBlock):
         def __init__(self, obj, axis=None):
@@ -4777,6 +4778,7 @@ def test_gamma_exception():
 
 @with_seed()
 @use_np
+@pytest.mark.skip(reason='https://github.com/apache/incubator-mxnet/issues/18600')
 def test_np_random_beta():
     class TestRandomBeta(HybridBlock):
         def __init__(self, size=None, dtype=None, ctx=None):
@@ -4821,6 +4823,7 @@ def test_np_random_beta():
 
 @with_seed()
 @use_np
+@pytest.mark.skip(reason='https://github.com/apache/incubator-mxnet/issues/18600')
 def test_np_random_f():
     class TestRandomF(HybridBlock):
         def __init__(self, size=None):
@@ -4852,6 +4855,7 @@ def test_np_random_f():
 
 @with_seed()
 @use_np
+@pytest.mark.skip(reason='https://github.com/apache/incubator-mxnet/issues/18600')
 def test_np_random_chisquare():
     class TestRandomChisquare(HybridBlock):
         def __init__(self, size=None, dtype=None, ctx=None):
