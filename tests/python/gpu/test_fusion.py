@@ -19,6 +19,7 @@ import os
 import random
 import mxnet as mx
 import numpy as np
+from mxnet import autograd, gluon
 from mxnet.test_utils import *
 
 curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
@@ -337,3 +338,35 @@ def test_fusion_reshape_executor():
     out = f.forward(is_train=False, data1=data, data2=data)
     assert out[0].sum().asscalar() == 150
 
+def test_input_reorder():
+    class Block(gluon.HybridBlock):
+        def __init__(self, **kwargs):
+            super(Block, self).__init__(**kwargs)
+
+        def hybrid_forward(self, F, x, y, z):
+            s = x * 2
+            s2 = s + z
+            s = F.broadcast_add(s, y * y)
+            return F.dot(s, s2)
+
+    for static_alloc in (False, True):
+        arg_shapes = [(10, 10), (10, 1), (10, 10)]
+        arg_data = [mx.random.uniform(shape=s) for s in arg_shapes]
+
+        arrays = {}
+        for use_fusion in ('0', '1'):
+            os.environ['MXNET_USE_FUSION'] = use_fusion
+            arrays[use_fusion] = {}
+            n = Block()
+            n.hybridize(static_alloc=static_alloc)
+            args = [arg.copyto(mx.gpu()) for arg in arg_data]
+            for arg in args:
+                arg.attach_grad()
+            with autograd.record():
+                r = n(*args)
+            arrays[use_fusion]['result'] = r
+            r.backward()
+            for i, arg in enumerate(args):
+                arrays[use_fusion][i] = arg.grad
+        for key in ['result'] + list(range(len(arg_data))):
+            assert_allclose(arrays['0'][key].asnumpy(), arrays['1'][key].asnumpy())
