@@ -1641,6 +1641,32 @@ int MXNDArraySave(const char* fname,
   API_END();
 }
 
+int MXNDArraySaveToBuffer(uint32_t num_args,
+                          NDArrayHandle* args,
+                          const char** keys,
+                          size_t *out_size,
+                          const char **out_buf) {
+  MXAPIThreadLocalEntry<> *ret = MXAPIThreadLocalStore<>::Get();
+  API_BEGIN();
+  std::vector<NDArray> data(num_args);
+  std::vector<std::string> names;
+  for (uint32_t i = 0; i < num_args; ++i) {
+    data[i] = *static_cast<NDArray*>(args[i]);
+  }
+  if (keys != nullptr) {
+    names.resize(num_args);
+    for (uint32_t i = 0; i < num_args; ++i) {
+      names[i] = keys[i];
+    }
+  }
+  ret->ret_str.resize(0);
+  dmlc::MemoryStringStream strm(&ret->ret_str);
+  mxnet::NDArray::Save(&strm, data, names);
+  *out_size = ret->ret_str.length();
+  *out_buf = ret->ret_str.c_str();
+  API_END();
+}
+
 int MXNDArrayLoad(const char* fname,
                   uint32_t *out_size,
                   NDArrayHandle** out_arr,

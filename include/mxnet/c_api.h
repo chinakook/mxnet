@@ -731,6 +731,22 @@ MXNET_DLL int MXNDArraySave(const char* fname,
                             uint32_t num_args,
                             NDArrayHandle* args,
                             const char** keys);
+
+/*!
+ * \brief Save list of narray into buffer.
+ * \param num_args number of arguments to save.
+ * \param args the array of NDArrayHandles to be saved.
+ * \param keys the name of the NDArray, optional, can be NULL
+ * \param out_size size of the raw bytes
+ * \param out_buf the head of returning memory bytes.
+ * \return 0 when success, -1 when failure happens
+ */
+MXNET_DLL int MXNDArraySaveToBuffer(uint32_t num_args,
+                                    NDArrayHandle* args,
+                                    const char** keys,
+                                    size_t *out_size,
+                                    const char **out_buf);
+
 /*!
  * \brief Load list of narray from the file.
  * \param fname name of the file.

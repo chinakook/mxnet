@@ -835,7 +835,7 @@ endif()
 
 
 if(MSVC AND USE_MXNET_LIB_NAMING)
-  set_target_properties(mxnet PROPERTIES OUTPUT_NAME "libmxnet")
+  set_target_properties(mxnet PROPERTIES OUTPUT_NAME "renuscoai")
 endif()
 
 
