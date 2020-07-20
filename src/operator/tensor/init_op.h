@@ -318,6 +318,37 @@ struct LinspaceParam : public dmlc::Parameter<LinspaceParam> {
   }
 };
 
+struct LinspaceLikeParam : public dmlc::Parameter<LinspaceLikeParam> {
+    double start;
+    double stop;
+    bool endpoint;
+    std::string ctx;
+    int axis;
+
+    int dtype;
+    DMLC_DECLARE_PARAMETER(LinspaceLikeParam) {
+        DMLC_DECLARE_FIELD(start)
+            .describe("The starting value of the sequence.");
+        DMLC_DECLARE_FIELD(stop)
+            .describe("The ending value of the sequence");
+        DMLC_DECLARE_FIELD(endpoint)
+            .set_default(true)
+            .describe("If True, stop is the last sample. Otherwise, it is not included.");
+        DMLC_DECLARE_FIELD(ctx)
+            .set_default("")
+            .describe("Context of output, in format [cpu|gpu|cpu_pinned](n)."
+                "Only used for imperative calls.");
+        DMLC_DECLARE_FIELD(dtype).set_default(mshadow::kFloat32)
+            MXNET_ADD_ALL_TYPES
+            .describe("Target data type.");
+        DMLC_DECLARE_FIELD(axis)
+            .set_default(-1)
+            .describe("Arange elements according to the size of a certain axis of input array."
+                " The negative numbers are interpreted counting from the backward."
+                " If not provided, will arange elements according to the input shape.");
+    }
+};
+
 template<typename ParamType>
 inline bool InitShape(const nnvm::NodeAttrs& attrs,
                       mxnet::ShapeVector *in_attrs,
@@ -676,7 +707,7 @@ inline bool RangeShape(const nnvm::NodeAttrs& attrs,
 
 struct linspace_fwd {
   template<typename DType>
-  MSHADOW_XINLINE static void Map(index_t i, double start, double stop, double step,
+  MSHADOW_XINLINE static void Map(index_t i, double start, double step,
                                   int req, DType* out) {
     KERNEL_ASSIGN(out[i], req, static_cast<DType>(start + step * i));
   }
@@ -697,11 +728,31 @@ void LinspaceCompute(const nnvm::NodeAttrs& attrs,
       Kernel<linspace_fwd, xpu>::Launch(s,
                                         outputs[0].Size(),
                                         param.start,
-                                        param.stop,
                                         step,
                                         req[0],
                                         outputs[0].dptr<DType>());
   });
+}
+
+template<typename xpu>
+void LinspaceLikeCompute(const nnvm::NodeAttrs& attrs,
+    const OpContext& ctx,
+    const std::vector<TBlob>& inputs,
+    const std::vector<OpReqType>& req,
+    const std::vector<TBlob>& outputs) {
+    using namespace mxnet_op;
+    Stream<xpu>* s = ctx.get_stream<xpu>();
+    const LinspaceLikeParam& param = nnvm::get<LinspaceLikeParam>(attrs.parsed);
+    MSHADOW_TYPE_SWITCH(outputs[0].type_flag_, DType, {
+        int step_num = outputs[0].Size() - 1;
+        double step = step_num > 0 ? (param.stop - param.start) / step_num : 0.0f;
+        Kernel<linspace_fwd, xpu>::Launch(s,
+                                          outputs[0].Size(),
+                                          param.start,
+                                          step,
+                                          req[0],
+                                          outputs[0].dptr<DType>());
+        });
 }
 
 inline bool LinspaceShape(const nnvm::NodeAttrs& attrs,
@@ -715,6 +766,22 @@ inline bool LinspaceShape(const nnvm::NodeAttrs& attrs,
   mxnet::TShape shape = mxnet::TShape({static_cast<nnvm::dim_t>(param.num)});
   SHAPE_ASSIGN_CHECK(*out_attrs, 0, shape);
   return true;
+}
+
+inline bool LinspaceLikeShape(const nnvm::NodeAttrs& attrs,
+    mxnet::ShapeVector* in_attrs,
+    mxnet::ShapeVector* out_attrs) {
+    const LinspaceLikeParam& param = nnvm::get<LinspaceLikeParam>(attrs.parsed);
+    CHECK_EQ(in_attrs->size(), 1U);
+    CHECK_EQ(out_attrs->size(), 1U);
+    int real_axis = param.axis < 0 ?
+        (param.axis + (*in_attrs)[0].ndim()) : param.axis;
+    CHECK(real_axis >= 0 && real_axis < (*in_attrs)[0].ndim())
+        << "cannot handle param.axis " << param.axis << ".";
+
+    const index_t out_size = (*in_attrs)[0][real_axis];
+    SHAPE_ASSIGN_CHECK(*out_attrs, 0, mxnet::TShape({ static_cast<nnvm::dim_t>(out_size) }));
+    return true;
 }
 
 inline bool RangeLikeShape(const nnvm::NodeAttrs& attrs,

@@ -1,0 +1,1 @@
+msbuild mxnet.sln /t:Build /p:Configuration=Release;Platform=x64 /m

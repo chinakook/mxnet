@@ -88,8 +88,8 @@ else:
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_vml_mc.dll',
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_vml_mc2.dll',
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/mkl_vml_mc3.dll',
-        'E:/proj/dev/mxcproj/deps/opencv4/build/x64/vc15/bin/opencv_ffmpeg410_64.dll',
-        'E:/proj/dev/mxcproj/deps/opencv4/build/x64/vc15/bin/opencv_world410.dll',
+        r'E:\proj\dev\opencv-4.3.0\opencv\build\install\x64\vc16\bin\opencv_videoio_ffmpeg430_64.dll',
+        r'E:\proj\dev\opencv-4.3.0\opencv\build\install\x64\vc16\bin\opencv_world430.dll',
     ]
 
 
