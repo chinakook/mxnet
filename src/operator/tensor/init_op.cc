@@ -35,6 +35,7 @@ DMLC_REGISTER_PARAMETER(RangeParam);
 DMLC_REGISTER_PARAMETER(RangeLikeParam);
 DMLC_REGISTER_PARAMETER(EyeParam);
 DMLC_REGISTER_PARAMETER(LinspaceParam);
+DMLC_REGISTER_PARAMETER(LinspaceLikeParam);
 
 NNVM_REGISTER_OP(_zeros_without_dtype)
 .describe("fill target with zeros without default dtype")
