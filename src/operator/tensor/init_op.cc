@@ -157,13 +157,13 @@ NNVM_REGISTER_OP(_contrib_linspace_like)
 .set_num_outputs(1)
 .set_attr_parser(ParamParser<LinspaceLikeParam>)
 .set_attr<mxnet::FInferShape>("FInferShape", LinspaceLikeShape)
-.set_attr<nnvm::FInferType>("FInferType", InitType<LinspaceParam>)
+.set_attr<nnvm::FInferType>("FInferType", ElemwiseType<1, 1>)
 .set_attr<nnvm::FIgnoreInputs>("FIgnoreInputs",
     [](const NodeAttrs& attrs) { return std::vector<uint32_t>(1, 0); })
 .set_attr<FCompute>("FCompute<cpu>", LinspaceLikeCompute<cpu>)
 .set_attr<nnvm::FGradient>("FGradient", MakeZeroGradNodes)
 .add_argument("data", "NDArray-or-Symbol", "The input")
-.add_arguments(RangeParam::__FIELDS__());
+.add_arguments(LinspaceLikeParam::__FIELDS__());
 
 NNVM_REGISTER_OP(zeros_like)
 MXNET_ADD_SPARSE_OP_ALIAS(zeros_like)
