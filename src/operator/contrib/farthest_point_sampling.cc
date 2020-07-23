@@ -93,11 +93,11 @@ NNVM_REGISTER_OP(_contrib_FarthestPointSampling)
     return std::vector<ResourceRequest>{ResourceRequest::kTempSpace};
   })
 .set_attr<FCompute>("FCompute<cpu>", FarthestPointSamplingCompute<cpu>)
-.set_attr<nnvm::FGradient>("FGradient",ElemwiseGradUseNone{"_contrib_backward_FarthestPointSampling"})
+.set_attr<nnvm::FGradient>("FGradient",ElemwiseGradUseNone{"_backward_contrib_FarthestPointSampling"})
 .add_argument("data", "NDArray-or-Symbol", "points")
 .add_arguments(FarthestPointSamplingParam::__FIELDS__());
 
-NNVM_REGISTER_OP(_backward_FarthestPointSampling)
+NNVM_REGISTER_OP(_backward_contrib_FarthestPointSampling)
 .set_num_inputs(1)
 .set_num_outputs(1)
 .set_attr<nnvm::TIsBackward>("TIsBackward", true)

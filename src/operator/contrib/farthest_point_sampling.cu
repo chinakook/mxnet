@@ -111,7 +111,7 @@ void FarthestPointSamplingGradCompute<gpu>(const nnvm::NodeAttrs& attrs,
 NNVM_REGISTER_OP(_contrib_FarthestPointSampling)
 .set_attr<FCompute>("FCompute<gpu>", FarthestPointSamplingCompute<gpu>);
 
-NNVM_REGISTER_OP(_backward_FarthestPointSampling)
+NNVM_REGISTER_OP(_backward_contrib_FarthestPointSampling)
 .set_attr<FCompute>("FCompute<gpu>", FarthestPointSamplingGradCompute<gpu>);
 
 } // namespace op

@@ -93,7 +93,7 @@ NNVM_REGISTER_OP(_contrib_GatherPoint)
 .add_argument("data", "NDArray-or-Symbol", "points")
 .add_argument("idx", "NDArray-or-Symbol", "index");
 
-NNVM_REGISTER_OP(_backward_GatherPoint)
+NNVM_REGISTER_OP(_backward_contrib_GatherPoint)
 .set_num_inputs(2)
 .set_num_outputs(1)
 .set_attr<nnvm::TIsBackward>("TIsBackward", true)

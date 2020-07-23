@@ -71,7 +71,7 @@ void GatherPointGradCompute<gpu>(const nnvm::NodeAttrs& attrs,
 NNVM_REGISTER_OP(_contrib_GatherPoint)
 .set_attr<FCompute>("FCompute<gpu>", GatherPointCompute<gpu>);
 
-NNVM_REGISTER_OP(_backward_GatherPoint)
+NNVM_REGISTER_OP(_backward_contrib_GatherPoint)
 .set_attr<FCompute>("FCompute<gpu>", GatherPointGradCompute<gpu>);
 
 } // namespace op
