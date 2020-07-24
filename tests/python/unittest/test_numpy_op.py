@@ -19,7 +19,6 @@
 from __future__ import absolute_import
 from distutils.version import StrictVersion
 import sys
-import unittest
 import itertools
 import numpy as _np
 import platform
@@ -1326,7 +1325,6 @@ def test_npx_slice(start, end, step, hybridize):
 
 @with_seed()
 @use_np
-@unittest.skip("NumpyBooleanAssignForwardCPU broken: https://github.com/apache/incubator-mxnet/issues/17990")
 def test_npx_batch_dot():
     ctx = mx.context.current_context()
     dtypes = ['float32', 'float64']
@@ -2276,7 +2274,7 @@ def test_np_tril():
 
     for prefix in [1, -1]:
         for shape, k in config:
-            data_np = _np.random.uniform(size=shape)
+            data_np = _np.random.uniform(size=shape).astype(_np.float32)
             data_mx = np.array(data_np, dtype=data_np.dtype)
             data_mx.attach_grad()
             ret_np = _np.tril(data_np, k*prefix)
@@ -2337,7 +2335,7 @@ def test_np_triu():
 
     for prefix in [1, -1]:
         for shape, k in config:
-            data_np = _np.random.uniform(size=shape)
+            data_np = _np.random.uniform(size=shape).astype(_np.float32)
             data_mx = np.array(data_np, dtype=data_np.dtype)
             data_mx.attach_grad()
             ret_np = _np.triu(data_np, k*prefix)
@@ -2541,7 +2539,7 @@ def test_np_bitwise_not(func, low, high, ndim):
         np_func = getattr(_np, func)
         mx_func = TestUnary(func)
         np_test_data = _np.random.uniform(low, high, shape).astype(_np.int32)
-        mx_test_data = mx.numpy.array(np_test_data)
+        mx_test_data = mx.numpy.array(np_test_data).astype(_np.int32)
         for hybridize in [True, False]:
             if hybridize:
                 mx_func.hybridize()
@@ -2713,7 +2711,7 @@ def test_np_binary_funcs():
 
 @with_seed()
 @use_np
-@pytest.mark.flaky()
+@pytest.mark.skip(reason='https://github.com/apache/incubator-mxnet/issues/16848')
 def test_np_mixed_precision_binary_funcs():
     itypes = [np.bool, np.int8, np.int32, np.int64]
     ftypes = [np.float16, np.float32, np.float64]
@@ -2814,6 +2812,46 @@ def test_np_mixed_precision_binary_funcs():
                     continue
                 check_mixed_precision_binary_func(func, low, high, lshape, rshape, lgrad, rgrad, type1, type2)
 
+@with_seed()
+@use_np
+def test_np_mixed_mxnp_op_funcs():
+    # generate onp & mx_np in same type
+    onp = _np.array([1,2,3,4,5]).astype("int64")
+    mx_np = mx.np.array([1,2,3,4,5]).astype("int64")
+    # inplace onp mx_np
+    onp += mx_np
+    assert isinstance(onp, _np.ndarray)
+    onp -= mx_np
+    assert isinstance(onp, _np.ndarray)
+    onp *= mx_np
+    assert isinstance(onp, _np.ndarray)
+    # inplace mx_np onp
+    mx_np ^= onp
+    assert isinstance(mx_np, mx.np.ndarray)
+    mx_np |= onp
+    assert isinstance(mx_np, mx.np.ndarray)
+    mx_np &= onp
+    assert isinstance(mx_np, mx.np.ndarray)
+    # mxnp onp
+    out = mx_np << onp
+    assert isinstance(out, mx.np.ndarray)
+    out = mx_np >> onp
+    assert isinstance(out, mx.np.ndarray)
+    out = mx_np != onp
+    assert isinstance(out, mx.np.ndarray)
+    # onp mxnp
+    out = onp == mx_np
+    assert isinstance(out, mx.np.ndarray)
+    out = onp >= mx_np
+    assert isinstance(out, mx.np.ndarray)
+    out = onp < mx_np
+    assert isinstance(out, mx.np.ndarray)
+    onp = _np.array([1,2,3,4,5]).astype("float32")
+    mx_np = mx.np.array([1,2,3,4,5]).astype("float32")
+    out = onp @ mx_np
+    assert isinstance(out, mx.np.ndarray)
+    out = onp / mx_np
+    assert isinstance(out, mx.np.ndarray)
 
 @with_seed()
 @use_np
@@ -5984,7 +6022,7 @@ def test_np_linalg_lstsq():
         def __init__(self, rcond):
             super(TestLstsq, self).__init__()
             self._rcond = rcond
-        
+
         def hybrid_forward(self, F, a, b, rcond='warn'):
             return F.np.linalg.lstsq(a, b, rcond=self._rcond)
 
@@ -6936,16 +6974,15 @@ def test_np_trace():
 @use_np
 def test_np_windows():
     class TestWindows(HybridBlock):
-        def __init__(self, func, M, dtype):
+        def __init__(self, func, M):
             super(TestWindows, self).__init__()
             self._func = func
             self._M = M
-            self._dtype = dtype
 
         def hybrid_forward(self, F, x, *args, **kwargs):
             op = getattr(F.np, self._func)
             assert op is not None
-            return x + op(M=self._M, dtype=self._dtype)
+            return x + op(M=self._M)
 
     configs = [-10, -3, -1, 0, 1, 6, 10, 20]
     dtypes = ['float32', 'float64']
@@ -6956,14 +6993,14 @@ def test_np_windows():
                 x = np.zeros(shape=(), dtype=dtype)
                 for hybridize in [False, True]:
                     np_func = getattr(_np, func)
-                    mx_func = TestWindows(func, M=config, dtype=dtype)
+                    mx_func = TestWindows(func, M=config)
                     np_out = np_func(M=config).astype(dtype)
                     if hybridize:
                         mx_func.hybridize()
                     mx_out = mx_func(x)
                     assert_almost_equal(mx_out.asnumpy(), np_out, rtol=1e-3, atol=1e-5)
                     # test imperative
-                    mx_out = getattr(np, func)(M=config, dtype=dtype)
+                    mx_out = getattr(np, func)(M=config)
                     np_out = np_func(M=config).astype(dtype)
                     assert_almost_equal(mx_out.asnumpy(), np_out, rtol=1e-3, atol=1e-5)
 
@@ -7381,10 +7418,10 @@ def test_np_tril_indices():
             if m is None:
                 m = n
             self._m = m
-        
+
         def hybrid_forward(self, F, x, *args, **kwargs):
             return x, F.np.tril_indices(n=self._n, k=self._k, m=self._m)
-    
+
     for n in _np.random.random_integers(-10, 50, 2):
         for k in _np.random.random_integers(-50, 50, 2):
             for m in _np.random.random_integers(-10, 50, 2):
@@ -7405,7 +7442,7 @@ def test_np_tril_indices():
                         np_data[np_out] = -10
                         mx_data[mx_out] = -10
                         assert same(np_data, mx_data.asnumpy())
-                        
+
 
 @with_seed()
 @use_np
@@ -8165,7 +8202,7 @@ def test_np_median():
         a = np.random.uniform(-1.0, 1.0, size=a_shape)
         np_out = _np.median(a.asnumpy(), axis=axis, keepdims=keepdims)
         mx_out = test_median(a)
-        
+
         assert mx_out.shape == np_out.shape
         assert_almost_equal(mx_out.asnumpy(), np_out, atol=atol, rtol=rtol)
 
@@ -9182,10 +9219,10 @@ def test_np_interp():
             self._left = left
             self._right = right
             self._period = period
-        
+
         def hybrid_forward(self, F, x, xp, fp):
             return F.np.interp(x, xp, fp, left=self._left, right=self._right, period=self._period)
-    
+
     class TestInterpScalar(HybridBlock):
         def __init__(self, x=None, left=None, right=None, period=None):
             super(TestInterpScalar, self).__init__()
@@ -9193,7 +9230,7 @@ def test_np_interp():
             self._left = left
             self._right = right
             self._period = period
-        
+
         def hybrid_forward(self, F, xp, fp):
             return F.np.interp(self._x, xp, fp, left=self._left, right=self._right, period=self._period)
 
@@ -9220,13 +9257,13 @@ def test_np_interp():
         else:
             x = np.random.uniform(0, 100, size=xshape).astype(xtype)
             xp = np.sort(np.random.choice(100, dsize, replace=False).astype(dtype))
-            fp = np.random.uniform(-50, 50, size=dsize).astype(dtype) 
+            fp = np.random.uniform(-50, 50, size=dsize).astype(dtype)
         np_x = x.asnumpy()
         if x_scalar and xshape == ():
             x = x.item()
             np_x = x
             test_interp = TestInterpScalar(x=x, left=left, right=right, period=period)
-        else: 
+        else:
             test_interp = TestInterp(left=left, right=right, period=period)
         if hybridize:
             test_interp.hybridize()
@@ -9614,7 +9651,7 @@ def test_np_rollaxis():
             super(TestRollaxis, self).__init__()
             self._axis = axis
             self._start = start
-             
+
         def hybrid_forward(self, F, a, *args, **kwargs):
             return F.np.rollaxis(a, axis=self._axis, start=self._start)
 
