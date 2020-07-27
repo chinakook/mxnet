@@ -299,7 +299,6 @@ foreach(var ${C_CXX_INCLUDE_DIRECTORIES})
 endforeach()
 
 include_directories("include")
-include_directories("3rdparty/nvidia_cub")
 include_directories("3rdparty/tvm/nnvm/include")
 include_directories("3rdparty/tvm/include")
 include_directories("3rdparty/dmlc-core/include")
@@ -640,13 +639,9 @@ if(USE_CUDA)
   link_directories(${CUDAToolkit_LIBRARY_DIR})
 endif()
 
-# unsupported: if caffe is a subdirectory of mxnet, load its CMakeLists.txt as well
-if(USE_PLUGIN_CAFFE)
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/caffe)
-    add_subdirectory(caffe)
-  endif()
+if(CUDAToolkit_VERSION_MAJOR LESS "11")
+  include_directories("3rdparty/nvidia_cub")
 endif()
-
 
 if(MSVC)
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /EHsc")
