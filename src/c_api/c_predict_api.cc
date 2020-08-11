@@ -525,6 +525,15 @@ int MXPredReshape(uint32_t num_input_nodes,
   API_END();
 }
 
+MXNET_DLL int MXPredGetOutputNum(PredictorHandle handle,
+                                 uint32_t* num_out)
+{
+  MXAPIPredictor* p = static_cast<MXAPIPredictor*>(handle);
+  API_BEGIN();
+  *num_out = p->out_arrays.size();
+  API_END();
+}
+
 int MXPredGetOutputShape(PredictorHandle handle,
                          uint32_t out_index,
                          uint32_t** shape_data,

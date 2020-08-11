@@ -217,6 +217,15 @@ MXNET_DLL int MXPredReshape(uint32_t num_input_nodes,
                   const uint32_t* input_shape_data,
                   PredictorHandle handle,
                   PredictorHandle* out);
+
+/*!
+ * \brief Get the number of output nodes.
+ * \param num_out The number of output nodes.
+ * \return 0 when success, -1 when failure.
+ */
+MXNET_DLL int MXPredGetOutputNum(PredictorHandle handle,
+                  uint32_t* num_out);
+
 /*!
  * \brief Get the shape of output node.
  *  The returned shape_data and shape_ndim is only valid before next call to MXPred function.

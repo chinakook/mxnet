@@ -29,13 +29,18 @@ set(CPP_PACKAGE_OP_H_HEADER ${CMAKE_CURRENT_LIST_DIR}/include/mxnet-cpp/op.h)
 target_sources(mxnet_cpp INTERFACE ${CPP_PACKAGE_HEADERS} ${CPP_PACKAGE_OP_H_HEADER})
 target_link_libraries(mxnet_cpp INTERFACE mxnet ${mxnet_LINKER_LIBS})
 
+find_package(PythonInterp 3.4 REQUIRED)
+if (PYTHONINTERP_FOUND)
+	message(STATUS "Python Interp Found: ${PYTHON_EXECUTABLE}")
+endif()
+
 add_custom_target(
   cpp_package_op_h ALL
   BYPRODUCTS ${CPP_PACKAGE_OP_H_HEADER}
   MAIN_DEPENDENCY mxnet
   DEPENDS mxnet ${CMAKE_CURRENT_SOURCE_DIR}/scripts/OpWrapperGenerator.py
   COMMAND echo "Running: OpWrapperGenerator.py"
-  COMMAND python OpWrapperGenerator.py $<TARGET_FILE:mxnet>
+  COMMAND ${PYTHON_EXECUTABLE} OpWrapperGenerator.py $<TARGET_FILE:mxnet>
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/scripts
 )
 add_dependencies(mxnet_cpp cpp_package_op_h)
