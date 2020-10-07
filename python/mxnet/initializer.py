@@ -509,7 +509,7 @@ class Uniform(Initializer):
 
     def _init_weight(self, _, arr):
         uniform_fn = _mx_np.random.uniform if is_np_array() else random.uniform
-        uniform_fn(-self.scale, self.scale, arr.shape, out=arr)
+        uniform_fn(-self.scale, self.scale, arr.shape, dtype=arr.dtype, out=arr)
 
 @register
 class Normal(Initializer):
@@ -543,7 +543,7 @@ class Normal(Initializer):
 
     def _init_weight(self, _, arr):
         normal_fn = _mx_np.random.normal if is_np_array() else random.normal
-        normal_fn(0, self.sigma, arr.shape, out=arr)
+        normal_fn(0, self.sigma, arr.shape, dtype=arr.dtype, out=arr)
 
 @register
 class Orthogonal(Initializer):
@@ -643,10 +643,10 @@ class Xavier(Initializer):
         scale = np.sqrt(self.magnitude / factor)
         if self.rnd_type == "uniform":
             uniform_fn = _mx_np.random.uniform if is_np_array() else random.uniform
-            uniform_fn(-scale, scale, arr.shape, out=arr)
+            uniform_fn(-scale, scale, arr.shape, dtype=arr.dtype, out=arr)
         elif self.rnd_type == "gaussian":
             normal_fn = _mx_np.random.normal if is_np_array() else random.normal
-            normal_fn(0, scale, arr.shape, out=arr)
+            normal_fn(0, scale, arr.shape, dtype=arr.dtype, out=arr)
         else:
             raise ValueError("Unknown random type")
 
