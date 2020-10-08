@@ -30,10 +30,26 @@
 namespace mxnet {
 namespace engine {
 inline Engine* CreateEngine() {
+#ifdef _WIN32
+    char val[260]{ '\0' };
+    GetEnvironmentVariableA("MXNET_ENGINE_TYPE", val, 260);
+    const bool default_engine = (strnlen_s(val, 260) == 0);
+    std::string stype;
+    if (default_engine)
+    {
+        stype = "ThreadedEnginePerDevice";
+    }
+    else
+    {
+        stype = val;
+    }
+    const char* type = stype.c_str();
+#else
   const char *type = getenv("MXNET_ENGINE_TYPE");
   const bool default_engine = (type == nullptr);
   if (type == nullptr) type = "ThreadedEnginePerDevice";
   std::string stype = type;
+#endif
 
   Engine *ret = nullptr;
   #if MXNET_PREDICT_ONLY == 0

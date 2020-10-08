@@ -99,10 +99,16 @@ void StorageImpl::Alloc(Storage::Handle* handle) {
 #if MXNET_USE_CUDA
             CUDA_CALL(cudaGetDeviceCount(&num_gpu_device));
             CHECK_GT(num_gpu_device, 0) << "GPU usage requires at least 1 GPU";
-
+#ifdef _WIN32
+            char type[260]{ '\0' };
+            GetEnvironmentVariableA("MXNET_GPU_MEM_POOL_TYPE", type, 260);
+            const bool default_pool = (strnlen_s(type, 260) == 0);
+            if (default_pool) strncpy_s(type, "Naive", 260);
+#else
             const char *type = getenv("MXNET_GPU_MEM_POOL_TYPE");
             const bool default_pool = (type == nullptr);
             if (default_pool) type = "Naive";
+#endif
             std::string strategy = type;
 
             if (strategy == "Round") {
