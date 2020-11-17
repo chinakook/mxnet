@@ -280,7 +280,7 @@ class _Symbol(Symbol):
 
     def __neg__(self):
         """x.__neg__() <=> - x"""
-        return self.__mul__(-1.0)
+        return negative(self)
 
     def __deepcopy__(self, _):
         return super(_Symbol, self).as_np_ndarray()
@@ -1577,13 +1577,15 @@ def _ufunc_helper(lhs, rhs, fn_array, fn_scalar, lfn_scalar, rfn_scalar=None, ou
         if isinstance(rhs, numeric_types):
             return fn_scalar(lhs, rhs, out=out)
         else:
+            is_int = isinstance(rhs, integer_types)
             if rfn_scalar is None:
                 # commutative function
-                return lfn_scalar(rhs, float(lhs), out=out)
+                return lfn_scalar(rhs, scalar=float(lhs), is_int=is_int, out=out)
             else:
-                return rfn_scalar(rhs, float(lhs), out=out)
+                return rfn_scalar(rhs, scalar=float(lhs), is_int=is_int, out=out)
     elif isinstance(rhs, numeric_types):
-        return lfn_scalar(lhs, float(rhs), out=out)
+        is_int = isinstance(rhs, integer_types)
+        return lfn_scalar(lhs, scalar=float(rhs), is_int=is_int, out=out)
     elif isinstance(rhs, Symbol):
         return fn_array(lhs, rhs, out=out)
     else:
@@ -2446,7 +2448,13 @@ def repeat(a, repeats, axis=None):
            [3, 4],
            [3, 4]])
     """
-    return _npi.repeat(a, repeats=repeats, axis=axis)
+    if isinstance(repeats, numeric_types):
+        repeats = [repeats]
+    if axis is not None:
+        tmp = swapaxes(a, 0, axis)
+        res = _npi.repeats(tmp, repeats=repeats, axis=0)
+        return swapaxes(res, 0, axis)
+    return _npi.repeats(a, repeats=repeats, axis=axis)
 
 
 def _unary_func_helper(x, fn_array, fn_scalar, out=None, **kwargs):

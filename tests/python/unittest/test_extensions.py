@@ -97,7 +97,7 @@ def test_custom_op():
     assert_almost_equal(in_grad_base[0].asnumpy(), in_grad2[0].asnumpy(), rtol=1e-3, atol=1e-3)
 
 @pytest.mark.skipif(check_platform(), reason="not all machine types supported")
-@pytest.mark.skipIf(is_cd_run(), reason="continuous delivery run - ignoring test")
+@pytest.mark.skipif(is_cd_run(), reason="continuous delivery run - ignoring test")
 def test_subgraph():
     # possible places to find library file
     if (os.name=='posix'):
@@ -130,8 +130,6 @@ def test_subgraph():
     sym = mx.sym.log(d)
 
     args = {'a':mx.nd.ones((3,2),ctx=mx.cpu()), 'b':mx.nd.ones((3,2),ctx=mx.cpu())}
-    arg_array = [mx.nd.ones((3,2),dtype='float32',ctx=mx.cpu()),
-                 mx.nd.ones((3,2),dtype='float32',ctx=mx.cpu())]
 
     # baseline - regular execution in MXNet
     exe = sym.bind(ctx=mx.cpu(), args=args)
@@ -147,14 +145,14 @@ def test_subgraph():
 
     # with propogating shapes/types, rejecting subgraph
     # this tests creating the subgraph and having the subgraph prop reject it
-    mysym2 = sym.optimize_for("myProp", arg_array, reject=True)
+    mysym2 = sym.optimize_for("myProp", args, reject=True)
     exe2 = mysym2.bind(ctx=mx.cpu(), args=args)
     out2 = exe2.forward()
     # check that result matches one executed by MXNet
     assert_almost_equal(out[0].asnumpy(), out2[0].asnumpy(), rtol=1e-3, atol=1e-3)
 
     # with propogating shapes/types
-    mysym3 = sym.optimize_for("myProp",arg_array)
+    mysym3 = sym.optimize_for("myProp",args)
     exe3 = mysym3.bind(ctx=mx.cpu(), args=args)
     out3 = exe3.forward()
     # check that result matches one executed by MXNet

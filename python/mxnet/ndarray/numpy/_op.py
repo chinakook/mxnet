@@ -4076,7 +4076,13 @@ def repeat(a, repeats, axis=None):
            [3, 4],
            [3, 4]])
     """
-    return _api_internal.repeat(a, repeats, axis)
+    if isinstance(repeats, numeric_types):
+        repeats = [repeats]
+    if axis is not None:
+        tmp = swapaxes(a, 0, axis)
+        res = _api_internal.repeats(tmp, repeats, 0)
+        return swapaxes(res, 0, axis)
+    return _api_internal.repeats(a, repeats, axis)
 
 
 # pylint: disable=redefined-outer-name
@@ -9595,6 +9601,7 @@ def sum(a, axis=None, dtype=None, out=None, keepdims=None, initial=None, where=N
     - Input type does not support Python native iterables(list, tuple, ...).
     - "out" param: cannot perform auto type cast. out ndarray's dtype must be the same as the expected output.
     - "initial" param is not supported yet. Please use ``None`` as input or skip it.
+    - The default type is float32.
 
     Examples
     --------
