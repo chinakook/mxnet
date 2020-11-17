@@ -262,7 +262,7 @@ endif
 
 ifeq ($(USE_CUDNN), 1)
 	CFLAGS += -DMSHADOW_USE_CUDNN=1
-	LDFLAGS += -lcudnn
+	# LDFLAGS += -lcudnn
 endif
 
 ifeq ($(USE_BLAS), openblas)

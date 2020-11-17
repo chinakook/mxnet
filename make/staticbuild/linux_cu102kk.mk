@@ -37,7 +37,7 @@ DEBUG = 0
 USE_SIGNAL_HANDLER = 1
 
 # the additional link flags you want to add
-ADD_LDFLAGS += -L/home/bluews/dev/cudnn/lib64 -lcudnn -L$(DEPS_PATH)/lib /usr/local/cuda/lib64/libculibos.a -lpng -ltiff -ljpeg -lz -ldl -lgfortran -Wl,--version-script=$(CURDIR)/make/config/libmxnet.ver,-rpath,'$${ORIGIN}',--gc-sections
+ADD_LDFLAGS += /home/bluews/dev/cudnn/lib64/libcudnn_static.a /home/bluews/dev/nccl/lib/libnccl_static.a -L$(DEPS_PATH)/lib /usr/local/cuda/lib64/libculibos.a -lpng -ltiff -ljpeg -lz -ldl -lgfortran -Wl,--version-script=$(CURDIR)/make/config/libmxnet.ver,-rpath,'$${ORIGIN}',--gc-sections
 
 # the additional compile flags you want to add
 ADD_CFLAGS += -I/home/bluews/dev/cudnn/include -I$(DEPS_PATH)/include -ffunction-sections -fdata-sections
