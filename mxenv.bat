@@ -1,2 +1,0 @@
-set PATH=D:\proj\dev\mx\build\install\bin;C:\Program Files (x86)\Graphviz2.38\bin;D:\proj\dev\opencv341\build\x64\vc14\bin;D:\proj\dev\cudnn\bin;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\redist\intel64_win\mkl;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\redist\intel64_win\compiler;D:\proj\dev\mx\build\Release;%PATH%
-set PYTHONPATH=D:\proj\dev\mx\python;%PYTHONPATH%
