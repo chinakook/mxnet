@@ -67,7 +67,8 @@ USE_CUDA = 1
 # if you have already add them to environment variable, leave it as NONE
 # USE_CUDA_PATH = /usr/local/cuda
 USE_CUDA_PATH = /usr/local/cuda
-CUDA_ARCH := -arch=sm_75 -gencode arch=compute_75,code=sm_75
+# CUDA_ARCH := -arch=sm_75 -gencode arch=compute_75,code=sm_75
+CUDA_ARCH := -gencode arch=compute_75,code=sm_75 -gencode arch=compute_86,code=[sm_86,compute_86]
 # whether to use CuDNN library
 USE_CUDNN = 1
 
