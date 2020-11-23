@@ -65,7 +65,16 @@ if platform.system() == 'Linux':
     ]
 else:
     liblist = [
-        '../../cudnn/bin/cudnn64_7.dll',
+        r'..\build\Release\mxnet_52.dll',
+        r'..\build\Release\\mxnet_61.dll',
+        r'..\build\Release\\mxnet_75.dll',
+        r'E:\proj\dev\cudnn\bin\cudnn64_8.dll',
+        r'E:\proj\dev\cudnn\bin\cudnn_adv_infer64_8.dll',
+        r'E:\proj\dev\cudnn\bin\cudnn_adv_train64_8.dll',
+        r'E:\proj\dev\cudnn\bin\cudnn_cnn_infer64_8.dll',
+        r'E:\proj\dev\cudnn\bin\cudnn_cnn_train64_8.dll',
+        r'E:\proj\dev\cudnn\bin\cudnn_ops_infer64_8.dll',
+        r'E:\proj\dev\cudnn\bin\cudnn_ops_train64_8.dll',
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/compiler/libiomp5md.dll',
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/compiler/libiompstubs5md.dll',
         'C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/redist/intel64/mkl/libimalloc.dll',
