@@ -24,8 +24,8 @@ __all__ = ['Concurrent', 'HybridConcurrent', 'Identity',
            'PixelShuffle3D']
 
 import warnings
-from .... import ndarray as nd, context
-from ...block import HybridBlock
+from .... import nd, context
+from ...block import HybridBlock, Block
 from ...nn import Sequential, HybridSequential, BatchNorm
 
 class Concurrent(Sequential):

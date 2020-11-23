@@ -26,6 +26,8 @@ import numpy as np
 
 from . import ndarray as nd
 from . import symbol as sym
+from . import optimizer as opt
+from . import metric
 from . import kvstore as kvs
 from .context import cpu
 
