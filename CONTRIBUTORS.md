@@ -254,6 +254,10 @@ List of Contributors
 * [Connor Goggins](https://github.com/connorgoggins)
 * [Wei Chu](https://github.com/waytrue17)
 * [Yang Shi](https://github.com/ys2843)
+* [Joe Evans](https://github.com/josephevans)
+* [Nikolay Ulmasov](https://github.com/r3stl355)
+* [Paweł Głomski](https://github.com/PawelGlomski-Intel)
+* [Andrzej Kotlowski](https://github.com/anko-intel)
 
 Label Bot
 ---------
