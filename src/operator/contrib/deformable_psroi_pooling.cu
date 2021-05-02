@@ -45,10 +45,10 @@ namespace cuda {
   __device__ DType bilinear_interp(const DType* data,
                                    const DType x, const DType y,
                                    const index_t width, const index_t height) {
-    index_t x1 = floor(x);
-    index_t x2 = ceil(x);
-    index_t y1 = floor(y);
-    index_t y2 = ceil(y);
+    index_t x1 = floorf(x);
+    index_t x2 = ceilf(x);
+    index_t y1 = floorf(y);
+    index_t y2 = ceilf(y);
     DType dist_x = static_cast<DType>(x - x1);
     DType dist_y = static_cast<DType>(y - y1);
     DType value11 = data[y1 * width + x1];
@@ -88,10 +88,10 @@ namespace cuda {
       // [start, end) interval for spatial sampling
       const DType* offset_bottom_rois = bottom_rois + n * 5;
       index_t roi_batch_ind = offset_bottom_rois[0];
-      DType roi_start_w = static_cast<DType>(round(offset_bottom_rois[1])) * spatial_scale - 0.5;
-      DType roi_start_h = static_cast<DType>(round(offset_bottom_rois[2])) * spatial_scale - 0.5;
-      DType roi_end_w = static_cast<DType>(round(offset_bottom_rois[3]) + 1.) * spatial_scale - 0.5;
-      DType roi_end_h = static_cast<DType>(round(offset_bottom_rois[4]) + 1.) * spatial_scale - 0.5;
+      DType roi_start_w = static_cast<DType>(roundf(offset_bottom_rois[1])) * spatial_scale - 0.5;
+      DType roi_start_h = static_cast<DType>(roundf(offset_bottom_rois[2])) * spatial_scale - 0.5;
+      DType roi_end_w = static_cast<DType>(roundf(offset_bottom_rois[3]) + 1.) * spatial_scale - 0.5;
+      DType roi_end_h = static_cast<DType>(roundf(offset_bottom_rois[4]) + 1.) * spatial_scale - 0.5;
 
       // Force too small ROIs to be 1x1
       DType roi_width = max(roi_end_w - roi_start_w, 0.1);  // avoid 0
@@ -104,8 +104,8 @@ namespace cuda {
       DType sub_bin_size_h = bin_size_h / static_cast<DType>(sample_per_part);
       DType sub_bin_size_w = bin_size_w / static_cast<DType>(sample_per_part);
 
-      index_t part_h = floor(static_cast<DType>(ph) / pooled_height * part_size);
-      index_t part_w = floor(static_cast<DType>(pw) / pooled_width * part_size);
+      index_t part_h = floorf(static_cast<DType>(ph) / pooled_height * part_size);
+      index_t part_w = floorf(static_cast<DType>(pw) / pooled_width * part_size);
       index_t class_id = ctop / channels_each_class;
       DType trans_x = no_trans ? static_cast<DType>(0) :
         bottom_trans[(((n * num_classes + class_id) * 2)
@@ -123,8 +123,8 @@ namespace cuda {
 
       DType sum = 0;
       index_t count = 0;
-      index_t gw = floor(static_cast<DType>(pw) * group_size / pooled_width);
-      index_t gh = floor(static_cast<DType>(ph) * group_size / pooled_height);
+      index_t gw = floorf(static_cast<DType>(pw) * group_size / pooled_width);
+      index_t gh = floorf(static_cast<DType>(ph) * group_size / pooled_height);
       gw = min(max(gw, static_cast<index_t>(0)), group_size - 1);
       gh = min(max(gh, static_cast<index_t>(0)), group_size - 1);
 
@@ -221,10 +221,10 @@ namespace cuda {
       // [start, end) interval for spatial sampling
       const DType* offset_bottom_rois = bottom_rois + n * 5;
       index_t roi_batch_ind = offset_bottom_rois[0];
-      DType roi_start_w = static_cast<DType>(round(offset_bottom_rois[1])) * spatial_scale - 0.5;
-      DType roi_start_h = static_cast<DType>(round(offset_bottom_rois[2])) * spatial_scale - 0.5;
-      DType roi_end_w = static_cast<DType>(round(offset_bottom_rois[3]) + 1.) * spatial_scale - 0.5;
-      DType roi_end_h = static_cast<DType>(round(offset_bottom_rois[4]) + 1.) * spatial_scale - 0.5;
+      DType roi_start_w = static_cast<DType>(roundf(offset_bottom_rois[1])) * spatial_scale - 0.5;
+      DType roi_start_h = static_cast<DType>(roundf(offset_bottom_rois[2])) * spatial_scale - 0.5;
+      DType roi_end_w = static_cast<DType>(roundf(offset_bottom_rois[3]) + 1.) * spatial_scale - 0.5;
+      DType roi_end_h = static_cast<DType>(roundf(offset_bottom_rois[4]) + 1.) * spatial_scale - 0.5;
 
       // Force too small ROIs to be 1x1
       DType roi_width = max(roi_end_w - roi_start_w, 0.1);  // avoid 0
@@ -237,8 +237,8 @@ namespace cuda {
       DType sub_bin_size_h = bin_size_h / static_cast<DType>(sample_per_part);
       DType sub_bin_size_w = bin_size_w / static_cast<DType>(sample_per_part);
 
-      index_t part_h = floor(static_cast<DType>(ph) / pooled_height * part_size);
-      index_t part_w = floor(static_cast<DType>(pw) / pooled_width * part_size);
+      index_t part_h = floorf(static_cast<DType>(ph) / pooled_height * part_size);
+      index_t part_w = floorf(static_cast<DType>(pw) / pooled_width * part_size);
       index_t class_id = ctop / channels_each_class;
       DType trans_x = no_trans ? static_cast<DType>(0) :
         bottom_trans[(((n * num_classes + class_id) * 2)
@@ -260,8 +260,8 @@ namespace cuda {
       DType diff_val = top_diff[index] / top_count[index];
       const DType* offset_bottom_data = bottom_data + roi_batch_ind * channels * height * width;
       DType* offset_bottom_data_diff = bottom_data_diff + roi_batch_ind * channels * height * width;
-      index_t gw = floor(static_cast<DType>(pw) * group_size / pooled_width);
-      index_t gh = floor(static_cast<DType>(ph) * group_size / pooled_height);
+      index_t gw = floorf(static_cast<DType>(pw) * group_size / pooled_width);
+      index_t gh = floorf(static_cast<DType>(ph) * group_size / pooled_height);
       gw = min(max(gw, static_cast<index_t>(0)), group_size - 1);
       gh = min(max(gh, static_cast<index_t>(0)), group_size - 1);
 
@@ -277,10 +277,10 @@ namespace cuda {
           h = min(max(h, 0.), height - 1.);
           index_t c = (ctop * group_size + gh) * group_size + gw;
           // backward on feature
-          index_t x0 = floor(w);
-          index_t x1 = ceil(w);
-          index_t y0 = floor(h);
-          index_t y1 = ceil(h);
+          index_t x0 = floorf(w);
+          index_t x1 = ceilf(w);
+          index_t y0 = floorf(h);
+          index_t y1 = ceilf(h);
           DType dist_x = w - x0, dist_y = h - y0;
           DType q00 = (1 - dist_x) * (1 - dist_y);
           DType q01 = (1 - dist_x) * dist_y;

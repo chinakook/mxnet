@@ -57,10 +57,10 @@ __global__ void ROIPoolForwardKernel(const int count, const Dtype* bottom_data,
       continue;
     }
 
-    int roi_start_w = round(bottom_rois[1] * spatial_scale);
-    int roi_start_h = round(bottom_rois[2] * spatial_scale);
-    int roi_end_w = round(bottom_rois[3] * spatial_scale);
-    int roi_end_h = round(bottom_rois[4] * spatial_scale);
+    int roi_start_w = roundf(bottom_rois[1] * spatial_scale);
+    int roi_start_h = roundf(bottom_rois[2] * spatial_scale);
+    int roi_end_w = roundf(bottom_rois[3] * spatial_scale);
+    int roi_end_h = roundf(bottom_rois[4] * spatial_scale);
 
     // Force malformed ROIs to be 1x1
     int roi_width = max(roi_end_w - roi_start_w + 1, 1);
@@ -70,13 +70,13 @@ __global__ void ROIPoolForwardKernel(const int count, const Dtype* bottom_data,
     Dtype bin_size_w = static_cast<Dtype>(roi_width)
                        / static_cast<Dtype>(pooled_width);
 
-    int hstart = static_cast<int>(floor(static_cast<Dtype>(ph)
+    int hstart = static_cast<int>(floorf(static_cast<Dtype>(ph)
                                         * bin_size_h));
-    int wstart = static_cast<int>(floor(static_cast<Dtype>(pw)
+    int wstart = static_cast<int>(floorf(static_cast<Dtype>(pw)
                                         * bin_size_w));
-    int hend = static_cast<int>(ceil(static_cast<Dtype>(ph + 1)
+    int hend = static_cast<int>(ceilf(static_cast<Dtype>(ph + 1)
                                      * bin_size_h));
-    int wend = static_cast<int>(ceil(static_cast<Dtype>(pw + 1)
+    int wend = static_cast<int>(ceilf(static_cast<Dtype>(pw + 1)
                                      * bin_size_w));
 
     // Add roi offsets and clip to input boundaries

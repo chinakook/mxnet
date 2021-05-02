@@ -65,10 +65,10 @@ __global__ void PSROIPoolForwardKernel(
     // [start, end) interval for spatial sampling
     const DType* offset_bottom_rois = bottom_rois + n * 5;
     int roi_batch_ind = offset_bottom_rois[0];
-    DType roi_start_w = static_cast<DType>(round(offset_bottom_rois[1])) * spatial_scale;
-    DType roi_start_h = static_cast<DType>(round(offset_bottom_rois[2])) * spatial_scale;
-    DType roi_end_w = static_cast<DType>(round(offset_bottom_rois[3]) + 1.) * spatial_scale;
-    DType roi_end_h = static_cast<DType>(round(offset_bottom_rois[4]) + 1.) * spatial_scale;
+    DType roi_start_w = static_cast<DType>(roundf(offset_bottom_rois[1])) * spatial_scale;
+    DType roi_start_h = static_cast<DType>(roundf(offset_bottom_rois[2])) * spatial_scale;
+    DType roi_end_w = static_cast<DType>(roundf(offset_bottom_rois[3]) + 1.) * spatial_scale;
+    DType roi_end_h = static_cast<DType>(roundf(offset_bottom_rois[4]) + 1.) * spatial_scale;
 
     // Force too small ROIs to be 1x1
     DType roi_width = max(roi_end_w - roi_start_w, 0.1);  // avoid 0
@@ -78,13 +78,13 @@ __global__ void PSROIPoolForwardKernel(
     DType bin_size_h = roi_height / static_cast<DType>(pooled_height);
     DType bin_size_w = roi_width / static_cast<DType>(pooled_width);
 
-    int hstart = floor(static_cast<DType>(ph) * bin_size_h
+    int hstart = floorf(static_cast<DType>(ph) * bin_size_h
                         + roi_start_h);
-    int wstart = floor(static_cast<DType>(pw)* bin_size_w
+    int wstart = floorf(static_cast<DType>(pw)* bin_size_w
                         + roi_start_w);
-    int hend = ceil(static_cast<DType>(ph + 1) * bin_size_h
+    int hend = ceilf(static_cast<DType>(ph + 1) * bin_size_h
                       + roi_start_h);
-    int wend = ceil(static_cast<DType>(pw + 1) * bin_size_w
+    int wend = ceilf(static_cast<DType>(pw + 1) * bin_size_w
                       + roi_start_w);
     // Add roi offsets and clip to input boundaries
     hstart = min(max(hstart, 0), height);
@@ -93,8 +93,8 @@ __global__ void PSROIPoolForwardKernel(
     wend = min(max(wend, 0), width);
     bool is_empty = (hend <= hstart) || (wend <= wstart);
 
-    int gw = floor(static_cast<DType>(pw)* group_size / pooled_width);
-    int gh = floor(static_cast<DType>(ph)* group_size / pooled_height);
+    int gw = floorf(static_cast<DType>(pw)* group_size / pooled_width);
+    int gh = floorf(static_cast<DType>(ph)* group_size / pooled_height);
     gw = min(max(gw, 0), group_size - 1);
     gh = min(max(gh, 0), group_size - 1);
     int c = (ctop*group_size + gh)*group_size + gw;
@@ -161,10 +161,10 @@ __global__ void PSROIPoolBackwardAccKernel(
     // [start, end) interval for spatial sampling
     const DType* offset_bottom_rois = bottom_rois + n * 5;
     int roi_batch_ind = offset_bottom_rois[0];
-    DType roi_start_w = static_cast<DType>(round(offset_bottom_rois[1])) * spatial_scale;
-    DType roi_start_h = static_cast<DType>(round(offset_bottom_rois[2])) * spatial_scale;
-    DType roi_end_w = static_cast<DType>(round(offset_bottom_rois[3]) + 1.) * spatial_scale;
-    DType roi_end_h = static_cast<DType>(round(offset_bottom_rois[4]) + 1.) * spatial_scale;
+    DType roi_start_w = static_cast<DType>(roundf(offset_bottom_rois[1])) * spatial_scale;
+    DType roi_start_h = static_cast<DType>(roundf(offset_bottom_rois[2])) * spatial_scale;
+    DType roi_end_w = static_cast<DType>(roundf(offset_bottom_rois[3]) + 1.) * spatial_scale;
+    DType roi_end_h = static_cast<DType>(roundf(offset_bottom_rois[4]) + 1.) * spatial_scale;
 
     // Force too small ROIs to be 1x1
     DType roi_width = max(roi_end_w - roi_start_w, 0.1);  // avoid 0
@@ -174,13 +174,13 @@ __global__ void PSROIPoolBackwardAccKernel(
     DType bin_size_h = roi_height / static_cast<DType>(pooled_height);
     DType bin_size_w = roi_width / static_cast<DType>(pooled_width);
 
-    int hstart = floor(static_cast<DType>(ph)* bin_size_h
+    int hstart = floorf(static_cast<DType>(ph)* bin_size_h
       + roi_start_h);
-    int wstart = floor(static_cast<DType>(pw)* bin_size_w
+    int wstart = floorf(static_cast<DType>(pw)* bin_size_w
       + roi_start_w);
-    int hend = ceil(static_cast<DType>(ph + 1) * bin_size_h
+    int hend = ceilf(static_cast<DType>(ph + 1) * bin_size_h
       + roi_start_h);
-    int wend = ceil(static_cast<DType>(pw + 1) * bin_size_w
+    int wend = ceilf(static_cast<DType>(pw + 1) * bin_size_w
       + roi_start_w);
     // Add roi offsets and clip to input boundaries
     hstart = min(max(hstart, 0), height);
@@ -190,8 +190,8 @@ __global__ void PSROIPoolBackwardAccKernel(
     bool is_empty = (hend <= hstart) || (wend <= wstart);
 
     // Compute c at bottom
-    int gw = floor(static_cast<DType>(pw)* group_size / pooled_width);
-    int gh = floor(static_cast<DType>(ph)* group_size / pooled_height);
+    int gw = floorf(static_cast<DType>(pw)* group_size / pooled_width);
+    int gh = floorf(static_cast<DType>(ph)* group_size / pooled_height);
     gw = min(max(gw, 0), group_size - 1);
     gh = min(max(gh, 0), group_size - 1);
     int c = (ctop*group_size + gh)*group_size + gw;

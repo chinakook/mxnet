@@ -80,8 +80,8 @@ __device__ DType deformable_im2col_bilinear(const DType* bottom_data,
                                             const index_t height,
                                             const index_t width,
                                             DType h, DType w) {
-  index_t h_low = floor(h);
-  index_t w_low = floor(w);
+  index_t h_low = floorf(h);
+  index_t w_low = floorf(w);
   index_t h_high;
   index_t w_high;
   if (h_low >= height - 1) {

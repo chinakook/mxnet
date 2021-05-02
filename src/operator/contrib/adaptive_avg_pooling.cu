@@ -26,8 +26,8 @@
 #include <algorithm>
 #include "adaptive_avg_pooling-inl.h"
 
-#define START_IND(a, b, c) static_cast<int>(floor(static_cast<float>(a * c) / b))
-#define END_IND(a, b, c) static_cast<int>(ceil(static_cast<float>((a + 1) * c) / b))
+#define START_IND(a, b, c) static_cast<int>(floorf(static_cast<float>(a * c) / b))
+#define END_IND(a, b, c) static_cast<int>(ceilf(static_cast<float>((a + 1) * c) / b))
 #define CUDA_MAX_THREADS 1024   // this is safe, in reality 256 is our limit
 
 namespace mxnet {

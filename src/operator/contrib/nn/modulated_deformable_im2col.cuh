@@ -97,8 +97,8 @@ template <typename DType>
 __device__ DType dmcn_im2col_bilinear(const DType* bottom_data, const int data_width,
   const int height, const int width, DType h, DType w) {
 
-  int h_low = floor(h);
-  int w_low = floor(w);
+  int h_low = floorf(h);
+  int w_low = floorf(w);
   int h_high = h_low + 1;
   int w_high = w_low + 1;
 
@@ -135,8 +135,8 @@ __device__ DType dmcn_get_gradient_weight(DType argmax_h, DType argmax_w,
     return 0;
   }
 
-  int argmax_h_low = floor(argmax_h);
-  int argmax_w_low = floor(argmax_w);
+  int argmax_h_low = floorf(argmax_h);
+  int argmax_w_low = floorf(argmax_w);
   int argmax_h_high = argmax_h_low + 1;
   int argmax_w_high = argmax_w_low + 1;
 
@@ -164,8 +164,8 @@ __device__ DType dmcn_get_coordinate_weight(DType argmax_h, DType argmax_w,
     return 0;
   }
 
-  int argmax_h_low = floor(argmax_h);
-  int argmax_w_low = floor(argmax_w);
+  int argmax_h_low = floorf(argmax_h);
+  int argmax_w_low = floorf(argmax_w);
   int argmax_h_high = argmax_h_low + 1;
   int argmax_w_high = argmax_w_low + 1;
 
