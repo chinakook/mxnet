@@ -1277,8 +1277,9 @@ class HybridBlock(Block):
         arg_names = set(sym.list_arguments())
         aux_names = set(sym.list_auxiliary_states())
         arg_dict = {}
-        for is_arg, name, param in self._cached_op_args:
+        for is_arg, param in self._cached_op_args:
             if not is_arg:
+                name = param.name
                 if name in arg_names:
                     arg_dict['arg:{}'.format(name)] = param._reduce()
                 else:
